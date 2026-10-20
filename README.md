@@ -50,7 +50,7 @@ Input: a single image containing **2–16 poses in a horizontal row**. Output: *
 
 If extraction refuses export, check the reported count, source diagnostic, and frame count. Do not assume that selecting a larger cell repairs a badly separated or touching source image.
 
-## Export verification and practical constraints
+## Increment 12 — Background preparation and vertical scrolling preview (development branch)\n\nBackground mode adds portrait presets: 360 × 640, 720 × 1280, 1080 × 1920, and 720 × 2560. Existing landscape and custom sizes remain. A crop notice estimates the source area removed by center-cover fitting; it does not alter processing. After successful WebP verification, the preview can play/pause a vertically repeating copy of the processed canvas at adjustable speed (default 35 px/sec). This is a visual inspection aid, not an automatic seam detector or repairer. The preview does not alter the downloaded image.\n\nAcceptance pending: verify portrait and landscape exports, visible seams with a deliberately non-seamless sample, continuous motion with a seamless sample, iPad/iPhone Safari usability, and existing chicken/cow regression before merging.\n\n## Export verification and practical constraints
 
 - Exports are WebP, not renamed PNGs. The app verifies the **RIFF/WEBP** signature and checks decoded dimensions; sprite-sheet export additionally checks that every cell contains visible pixels and transparency.
 - WebP encoding uses the browser when supported, with a WebAssembly fallback loaded from an external service when needed. **Internet access may be required for fallback encoding**; do not assume offline operation.
