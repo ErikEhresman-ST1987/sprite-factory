@@ -11,3 +11,5 @@
 #sheetExtraction{max-width:100%}
 
 #componentDiagnostics{margin:12px 0 18px}#componentText{margin:8px 0}#detectCharacters{background:#a9c9e4;color:#132334}
+
+.background-stage{display:flex;align-items:center;justify-content:center;padding:10px;border-radius:10px;background:#111821}.background-stage canvas{width:min(100%,270px);height:auto;max-height:480px;object-fit:contain;border:1px solid #657689;border-radius:6px}#cropNotice{margin:8px 0 0;color:#d3dfeb}
