@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Scene Editor · Game Graphics Workshop</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#111821;color:#eef3f8;font:16px system-ui,-apple-system,sans-serif}main{max-width:1100px;margin:auto;padding:16px}a{color:#a6e1d0}h1{font-size:25px;margin:12px 0 5px}p{color:#b7c4d1;margin:0 0 16px}button,.file{display:inline-block;background:#294459;color:#fff;border:1px solid #607d90;border-radius:9px;padding:11px 13px;font:inherit;min-height:44px;cursor:pointer}button:focus-visible,.file:focus-within{outline:3px solid #a6e1d0}button:disabled{opacity:.45}.toolbar{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.file input{display:none}.stage{position:relative;border:1px solid #526579;border-radius:12px;background:#202b38;overflow:hidden;touch-action:none}.stage canvas{display:block;width:100%;height:auto;aspect-ratio:4/3;touch-action:none}.controls{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin:15px 0}.controls label{display:flex;align-items:center;gap:8px}.controls input{width:145px}#status{color:#b7c4d1;min-height:28px}small{color:#b7c4d1}.notice{padding:12px;background:#203344;border-radius:9px}
+</style></head><body><main><a href="../index.html">← Workshop Home</a><h1>Scene Editor</h1><p>First prototype: place one image over a background. Drag the image to move it, adjust its size, and save a portable project.</p>
+<div class="toolbar">
+<label class="file">Load background<input id="background" type="file" accept="image/*"></label>
+<label class="file">Load sprite<input id="sprite" type="file" accept="image/*"></label>
+<button id="center">Center sprite</button><button id="save">Download project</button>
+<label class="file">Open project<input id="project" type="file" accept=".json,application/json"></label>
+<button id="reset">Clear scene</button>
+</div>
+<div class="stage"><canvas id="canvas" width="800" height="600" aria-label="Scene preview; drag the sprite to position it"></canvas></div>
+<div class="controls"><label>Sprite width <input id="width" type="range" min="20" max="700" step="1" value="180"></label><output id="size">180 px</output><button id="smaller">− 5 px</button><button id="larger">+ 5 px</button></div>
+<div id="status" role="status">Load a background and a sprite to begin.</div>
+<p class="notice"><small>All editing happens in this browser. Download Project saves both images and coordinates in one JSON file. No files are uploaded. Keep a downloaded copy: this prototype does not autosave. Images with very large dimensions can create large project files.</small></p>
+</main>
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id),canvas=$('canvas'),ctx=canvas.getContext('2d');
+const W=800,H=600;let bg=null,sp=null,bgData='',spData='',pos={x:400,y:300,w:180},drag=null;
+const status=s=>$('status').textContent=s;
+function draw(){ctx.clearRect(0,0,W,H);ctx.fillStyle='#2c3b48';ctx.fillRect(0,0,W,H);if(bg){const scale=Math.min(W/bg.width,H/bg.height);const w=bg.width*scale,h=bg.height*scale;ctx.drawImage(bg,(W-w)/2,(H-h)/2,w,h)}else{ctx.fillStyle='#a7b6c4';ctx.textAlign='center';ctx.font='18px system-ui';ctx.fillText('Load a background image',W/2,H/2)}if(sp){const h=pos.w*sp.height/sp.width;ctx.drawImage(sp,pos.x-pos.w/2,pos.y-h/2,pos.w,h);ctx.strokeStyle='#a7e9d3';ctx.lineWidth=2;ctx.strokeRect(pos.x-pos.w/2,pos.y-h/2,pos.w,h)}} 
+function update(){pos.w=Number($('width').value);$('size').textContent=pos.w+' px';draw()}
+function image(data){return new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=()=>reject(Error('Image could not be decoded'));im.src=data})}
+function read(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(Error('Could not read file'));reader.readAsDataURL(file)})}
+async function loadImage(input,kind){const file=input.files&&input.files[0];if(!file)return;try{const data=await read(file),im=await image(data);if(kind==='bg'){bg=im;bgData=data}else{sp=im;spData=data;pos={x:400,y:300,w:180};$('width').value=180}update();status(file.name+' loaded')}catch(e){status(e.message)}finally{input.value=''}}
+$('background').addEventListener('change',e=>loadImage(e.target,'bg'));$('sprite').addEventListener('change',e=>loadImage(e.target,'sp'));
+function coords(e){const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}}
+canvas.addEventListener('pointerdown',e=>{if(!sp)return;const p=coords(e),h=pos.w*sp.height/sp.width;if(p.x<pos.x-pos.w/2||p.x>pos.x+pos.w/2||p.y<pos.y-h/2||p.y>pos.y+h/2)return;drag={id:e.pointerId,dx:pos.x-p.x,dy:pos.y-p.y};canvas.setPointerCapture(e.pointerId)});
+canvas.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;const p=coords(e);pos.x=Math.round(Math.max(0,Math.min(W,p.x+drag.dx)));pos.y=Math.round(Math.max(0,Math.min(H,p.y+drag.dy)));draw()});
+function end(e){if(drag&&e.pointerId===drag.id)drag=null}canvas.addEventListener('pointerup',end);canvas.addEventListener('pointercancel',end);
+$('width').addEventListener('input',update);
+$('smaller').onclick=()=>{$('width').value=Math.max(20,pos.w-5);update()};
+$('larger').onclick=()=>{$('width').value=Math.min(700,pos.w+5);update()};
+$('center').onclick=()=>{pos.x=400;pos.y=300;draw()};
+$('reset').onclick=()=>{if(!confirm('Clear this scene? Download your project first if needed.'))return;bg=sp=null;bgData=spData='';pos={x:400,y:300,w:180};$('width').value=180;update();status('Scene cleared')};
+$('save').onclick=()=>{if(!bgData&&!spData){status('Load artwork before saving');return}const data={format:'game-graphics-workshop-scene',version:1,canvas:{width:W,height:H},background:bgData,sprite:spData,placement:{...pos}};const blob=new Blob([JSON.stringify(data)],{type:'application/json'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='workshop-scene.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);status('Project download prepared')};
+$('project').addEventListener('change',async e=>{const f=e.target.files&&e.target.files[0];if(!f)return;try{const data=JSON.parse(await f.text());if(data.format!=='game-graphics-workshop-scene'||data.version!==1||data.canvas?.width!==W||data.canvas?.height!==H)throw Error('Unsupported project format');const p=data.placement;if(!p||![p.x,p.y,p.w].every(Number.isFinite)||p.w<20||p.w>700||p.x<0||p.x>W||p.y<0||p.y>H)throw Error('Invalid placement data');if((data.background&&!data.background.startsWith('data:image/'))||(data.sprite&&!data.sprite.startsWith('data:image/')))throw Error('Invalid image data');const newBg=data.background?await image(data.background):null,newSp=data.sprite?await image(data.sprite):null;bg=newBg;sp=newSp;bgData=data.background||'';spData=data.sprite||'';pos={x:p.x,y:p.y,w:p.w};$('width').value=pos.w;update();status('Project restored')}catch(err){status('Open failed: '+err.message)}finally{e.target.value=''}});
+draw();
+})();
+</script></body></html>
