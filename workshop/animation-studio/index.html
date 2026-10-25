@@ -66,8 +66,13 @@ const x=i*size+(size/2)+(f.x-W/2)*scale-dw/2;
 const y=size/2+(f.y-H/2)*scale-dh/2;
 c.drawImage(f.im,x,y,dw,dh)
 }
-const blob=await new Promise((resolve,reject)=>strip.toBlob(b=>b?resolve(b):reject(Error('WebP encoding failed')),'image/webp',.92));
-if(blob.type!=='image/webp')throw Error('This browser did not produce WebP; export cancelled');
+let blob=await new Promise(resolve=>strip.toBlob(resolve,'image/webp',.95)),encoder='browser';
+if(!blob||blob.type!=='image/webp'){
+encoder='WebAssembly';
+status('Browser WebP unavailable; loading fallback encoder…');
+const codec=await import('https://esm.sh/@jsquash/webp@1.5.0');
+blob=new Blob([await codec.encode(c.getImageData(0,0,width,size))],{type:'image/webp'});
+}
 const check=await createImageBitmap(blob);
 const valid=check.width===width&&check.height===size;check.close();
 if(!valid)throw Error('Encoded WebP dimensions did not match expected strip');
@@ -75,7 +80,7 @@ const bytes=new Uint8Array(await blob.slice(0,12).arrayBuffer());
 const tag=(start)=>String.fromCharCode(...bytes.slice(start,start+4));
 if(tag(0)!=='RIFF'||tag(8)!=='WEBP')throw Error('Encoded file failed WebP signature verification');
 download(blob,'animation-'+count+'frames-'+size+'px.webp');
-status('Verified WebP sprite strip: '+count+' frames × '+size+' px; '+width+' × '+size+' total. Playback '+$('fps').value+' FPS (set this speed in the game).')
+status('Verified WebP sprite strip ('+encoder+'): '+count+' frames × '+size+' px; '+width+' × '+size+' total. Playback '+$('fps').value+' FPS (set this speed in the game).')
 }catch(err){status('Export failed: '+err.message)}
 finally{btn.disabled=!frames.length}
 };
