@@ -79,8 +79,11 @@ if(!valid)throw Error('Encoded WebP dimensions did not match expected strip');
 const bytes=new Uint8Array(await blob.slice(0,12).arrayBuffer());
 const tag=(start)=>String.fromCharCode(...bytes.slice(start,start+4));
 if(tag(0)!=='RIFF'||tag(8)!=='WEBP')throw Error('Encoded file failed WebP signature verification');
-download(blob,'animation-'+count+'frames-'+size+'px.webp');
-status('Verified WebP sprite strip ('+encoder+'): '+count+' frames × '+size+' px; '+width+' × '+size+' total. Playback '+$('fps').value+' FPS (set this speed in the game).')
+const basename='animation-'+count+'frames-'+size+'px';
+download(blob,basename+'.webp');
+const metadata={format:'game-graphics-animation',version:1,asset:basename+'.webp',frameWidth:size,frameHeight:size,frameCount:count,fps:Number($('fps').value),layout:'horizontal',loop:true};
+download(new Blob([JSON.stringify(metadata,null,2)],{type:'application/json'}),basename+'.json');
+status('Verified WebP sprite strip ('+encoder+'): '+count+' frames × '+size+' px; '+width+' × '+size+' total. Playback '+$('fps').value+' FPS; matching metadata JSON prepared.')
 }catch(err){status('Export failed: '+err.message)}
 finally{btn.disabled=!frames.length}
 };
