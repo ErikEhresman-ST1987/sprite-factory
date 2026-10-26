@@ -21,7 +21,7 @@ async function inputs(){
  for(const k of ['frameWidth','frameHeight','frameCount','fps'])if(!Number.isInteger(ani[k])||ani[k]<1)throw Error('Invalid animation '+k);
  if(ani.frameCount*ani.frameWidth>4096||ani.frameCount>32||ani.fps>60)throw Error('Animation dimensions or speed exceed verification limits.');
  // Exported filenames can change when Safari downloads duplicates; verify actual frame dimensions instead.
- strip=await bitmap(fileUrl(af));if(strip.naturalWidth!==ani.frameCount*ani.frameWidth||strip.naturalHeight!==ani.frameHeight)throw Error('WebP dimensions do not match JSON frame metadata.');
+ strip=await bitmap(fileUrl(af));if(strip.naturalWidth!==ani.frameCount*ani.frameWidth||strip.naturalHeight!==ani.frameHeight)throw Error('WebP dimensions: '+strip.naturalWidth+' × '+strip.naturalHeight+'; JSON expects: '+(ani.frameCount*ani.frameWidth)+' × '+ani.frameHeight+' ('+ani.frameCount+' frames, '+ani.frameWidth+' × '+ani.frameHeight+' each). Check that both files are from the same export.');
  uploaded=true;
  }
  if(sf){place=await readJson(sf);if(place.format!=='game-graphics-placement'||place.version!==1||!place.canvas||!Array.isArray(place.objects))throw Error('Placement JSON is not a supported Workshop export.');
