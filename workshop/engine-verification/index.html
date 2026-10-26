@@ -58,7 +58,7 @@ async function run(){
  }else{
  const Phaser=await load('https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js','Phaser');if(id!==token)return;
  const game=new Phaser.Game({type:Phaser.CANVAS,parent:'view',width:w,height:h,backgroundColor:'#344756',scale:{mode:Phaser.Scale.NONE},scene:{create(){try{
- const keyMap=new Map();let index=0;for(const [key,img] of Object.entries(sceneArt)){const id='scene_'+index++;this.textures.addCanvas(id,img);keyMap.set(key,id)}
+ const keyMap=new Map();let index=0;for(const [key,img] of Object.entries(sceneArt)){const id='scene_'+index++;const sourceCanvas=document.createElement('canvas');sourceCanvas.width=img.naturalWidth||img.width;sourceCanvas.height=img.naturalHeight||img.height;sourceCanvas.getContext('2d').drawImage(img,0,0);this.textures.addCanvas(id,sourceCanvas);keyMap.set(key,id)}
  const stripCanvas=document.createElement('canvas');stripCanvas.width=strip.width||strip.naturalWidth;stripCanvas.height=strip.height||strip.naturalHeight;stripCanvas.getContext('2d').drawImage(strip,0,0);
  this.textures.addSpriteSheet('demo-strip',stripCanvas,{frameWidth:ani.frameWidth,frameHeight:ani.frameHeight});
  for(const o of objects)this.add.image(o.x,o.y,keyMap.get(o.asset)).setDisplaySize(o.width,o.height).setAngle(o.rotation).setDepth(o.layer);
