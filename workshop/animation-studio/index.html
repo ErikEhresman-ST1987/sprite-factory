@@ -16,16 +16,16 @@
 <label>Speed <input id="fps" type="range" min="1" max="12" value="6" step="1"></label><output id="speed">6 FPS</output>
 <label><input id="ghost" type="checkbox" checked> Previous-frame ghost</label>
 </div>
-<div class="toolbar"><label>Export frame size <select id="exportSize"><option value="128">128 × 128</option><option value="256" selected>256 × 256</option><option value="512">512 × 512</option></select></label><button id="exportWebp">Export WebP sprite strip</button></div>
+<div class="toolbar"><label>Export frame size <select id="exportSize"><option value="128">128 × 128</option><option value="256" selected>256 × 256</option><option value="512">512 × 512</option></select></label><button id="exportWebp">Prepare WebP and JSON</button><button id="downloadWebp" disabled>Download WebP image</button><button id="downloadJson" disabled>Download JSON metadata</button></div>
 <div class="toolbar"><button id="save">Download editable project</button><label class="file">Open project<input id="project" type="file" accept=".json,application/json"></label></div>
 <div id="status" role="status">Add two or more frames to begin. Drag the selected frame to align it.</div>
-<p class="notice"><small>Increment 3B: Export a transparent horizontal WebP sprite strip. Each frame uses the same canvas-based alignment and fits proportionally into its square cell. Maximum strip width: 4096 pixels. The export is a sprite sheet, not a self-playing animated WebP. Download your editable project to preserve your work; this version does not autosave. Frames are shown at their original pixel sizes up to a maximum fit of 600 × 450, without changing the source artwork.</small></p>
+<p class="notice"><small>Increment 3B: Export a transparent horizontal WebP sprite strip. Each frame uses the same canvas-based alignment and fits proportionally into its square cell. Maximum strip width: 4096 pixels. After preparing, download the WebP and JSON separately for iPad Safari reliability. The export is a sprite sheet, not a self-playing animated WebP. Download your editable project to preserve your work; this version does not autosave. Frames are shown at their original pixel sizes up to a maximum fit of 600 × 450, without changing the source artwork.</small></p>
 </main>
 <script>
 (()=>{
 'use strict';
 const $=id=>document.getElementById(id),canvas=$('canvas'),ctx=canvas.getContext('2d'),W=800,H=600;
-let frames=[],selected=0,playing=false,elapsed=0,last=0,drag=null;
+let frames=[],selected=0,playing=false,elapsed=0,last=0,drag=null,prepared=null;
 const status=s=>$('status').textContent=s;
 function decode(src){return new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=()=>reject(Error('Could not decode image'));im.src=src})}
 function read(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(Error('Could not read image'));reader.readAsDataURL(file)})}
@@ -35,25 +35,26 @@ const f=frames[selected];if(!f){ctx.fillStyle='#c0ceda';ctx.font='20px system-ui
 if(!playing&&$('ghost').checked&&frames.length>1){const prior=frames[(selected-1+frames.length)%frames.length],d=dimensions(prior.im);ctx.save();ctx.globalAlpha=.22;ctx.drawImage(prior.im,prior.x-d.w/2,prior.y-d.h/2,d.w,d.h);ctx.restore()}
 const d=dimensions(f.im);ctx.drawImage(f.im,f.x-d.w/2,f.y-d.h/2,d.w,d.h);if(!playing){ctx.strokeStyle='#a6e1d0';ctx.strokeRect(f.x-d.w/2,f.y-d.h/2,d.w,d.h)}
 }
+function invalidateExport(){prepared=null;$('downloadWebp').disabled=true;$('downloadJson').disabled=true}
 function refresh(){const select=$('frames');select.replaceChildren();frames.forEach((f,i)=>{const o=document.createElement('option');o.value=String(i);o.textContent=(i+1)+': '+f.name;select.append(o)});selected=Math.max(0,Math.min(selected,frames.length-1));select.value=String(selected);select.disabled=!frames.length;$('previous').disabled=!frames.length;$('next').disabled=!frames.length;$('resetFrame').disabled=!frames.length;$('play').disabled=frames.length<2;$('exportWebp').disabled=!frames.length;$('play').textContent=playing?'Pause':'Play';draw()}
 function pause(){playing=false;$('play').textContent='Play';draw()}
-$('import').addEventListener('change',async e=>{const files=Array.from(e.target.files||[]);if(!files.length)return;pause();try{const added=[];for(const file of files){const data=await read(file),im=await decode(data);added.push({name:file.name,data,im,x:400,y:300})}frames.push(...added);selected=frames.length-added.length;refresh();status('Added '+added.length+' frame(s); '+frames.length+' total')}catch(err){status('Import failed: '+err.message)}finally{e.target.value=''}});
+$('import').addEventListener('change',async e=>{const files=Array.from(e.target.files||[]);if(!files.length)return;pause();try{const added=[];for(const file of files){const data=await read(file),im=await decode(data);added.push({name:file.name,data,im,x:400,y:300})}invalidateExport();frames.push(...added);selected=frames.length-added.length;refresh();status('Added '+added.length+' frame(s); '+frames.length+' total')}catch(err){status('Import failed: '+err.message)}finally{e.target.value=''}});
 $('frames').addEventListener('change',e=>{pause();selected=Number(e.target.value);refresh()});
-$('ghost').addEventListener('change',draw);$('fps').addEventListener('input',()=>{$('speed').textContent=$('fps').value+' FPS'});
+$('ghost').addEventListener('change',draw);$('fps').addEventListener('input',()=>{invalidateExport();$('speed').textContent=$('fps').value+' FPS'});
 $('previous').onclick=()=>{pause();selected=(selected-1+frames.length)%frames.length;refresh()};
 $('next').onclick=()=>{pause();selected=(selected+1)%frames.length;refresh()};
 $('play').onclick=()=>{if(playing){pause();return}if(frames.length<2)return;playing=true;elapsed=0;last=0;refresh();requestAnimationFrame(tick)};
 function tick(t){if(!playing)return;if(last){elapsed+=Math.min(250,t-last);const step=1000/Number($('fps').value);if(elapsed>=step){const count=Math.floor(elapsed/step);selected=(selected+count)%frames.length;elapsed%=step;draw();$('frames').value=String(selected)}}last=t;requestAnimationFrame(tick)}
-$('resetFrame').onclick=()=>{if(frames[selected]){pause();frames[selected].x=400;frames[selected].y=300;draw()}};
-$('clear').onclick=()=>{if(!frames.length||!confirm('Clear all frames? Download your project first if needed.'))return;pause();frames=[];selected=0;refresh();status('Frames cleared')};
+$('resetFrame').onclick=()=>{if(frames[selected]){pause();invalidateExport();frames[selected].x=400;frames[selected].y=300;draw()}};
+$('clear').onclick=()=>{if(!frames.length||!confirm('Clear all frames? Download your project first if needed.'))return;pause();invalidateExport();frames=[];selected=0;refresh();status('Frames cleared')};
 function point(e){const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}}
 canvas.addEventListener('pointerdown',e=>{if(playing||!frames.length)return;const f=frames[selected],d=dimensions(f.im),p=point(e);if(Math.abs(p.x-f.x)>d.w/2||Math.abs(p.y-f.y)>d.h/2)return;drag={id:e.pointerId,dx:f.x-p.x,dy:f.y-p.y};canvas.setPointerCapture(e.pointerId)});
-canvas.addEventListener('pointermove',e=>{if(!drag||drag.id!==e.pointerId)return;const p=point(e),f=frames[selected];f.x=Math.round(Math.max(0,Math.min(W,p.x+drag.dx)));f.y=Math.round(Math.max(0,Math.min(H,p.y+drag.dy)));draw()});
+canvas.addEventListener('pointermove',e=>{if(!drag||drag.id!==e.pointerId)return;const p=point(e),f=frames[selected];invalidateExport();f.x=Math.round(Math.max(0,Math.min(W,p.x+drag.dx)));f.y=Math.round(Math.max(0,Math.min(H,p.y+drag.dy)));draw()});
 function end(e){if(drag&&drag.id===e.pointerId)drag=null}canvas.addEventListener('pointerup',end);canvas.addEventListener('pointercancel',end);
 function download(blob,filename){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000)}
 $('exportWebp').onclick=async()=>{
 if(!frames.length){status('Import at least one frame first');return}
-const size=Number($('exportSize').value),count=frames.length,width=size*count;
+invalidateExport();const size=Number($('exportSize').value),count=frames.length,width=size*count;
 if(![128,256,512].includes(size)||width>4096){status('Export blocked: '+count+' frames at '+size+' px exceed the 4096-pixel strip limit. Select a smaller frame size or use fewer frames.');return}
 const btn=$('exportWebp');btn.disabled=true;status('Preparing '+count+' WebP frames…');
 try{
@@ -80,17 +81,20 @@ const bytes=new Uint8Array(await blob.slice(0,12).arrayBuffer());
 const tag=(start)=>String.fromCharCode(...bytes.slice(start,start+4));
 if(tag(0)!=='RIFF'||tag(8)!=='WEBP')throw Error('Encoded file failed WebP signature verification');
 const basename='animation-'+count+'frames-'+size+'px';
-download(blob,basename+'.webp');
 const metadata={format:'game-graphics-animation',version:1,asset:basename+'.webp',frameWidth:size,frameHeight:size,frameCount:count,fps:Number($('fps').value),layout:'horizontal',loop:true};
-download(new Blob([JSON.stringify(metadata,null,2)],{type:'application/json'}),basename+'.json');
-status('Verified WebP sprite strip ('+encoder+'): '+count+' frames × '+size+' px; '+width+' × '+size+' total. Playback '+$('fps').value+' FPS; matching metadata JSON prepared.')
+prepared={webp:blob,webpName:basename+'.webp',json:new Blob([JSON.stringify(metadata,null,2)],{type:'application/json'}),jsonName:basename+'.json'};
+$('downloadWebp').disabled=false;$('downloadJson').disabled=false;
+status('Verified WebP sprite strip ('+encoder+'): '+count+' frames × '+size+' px; '+width+' × '+size+' total. Tap Download WebP image, then Download JSON metadata.');
 }catch(err){status('Export failed: '+err.message)}
 finally{btn.disabled=!frames.length}
 };
+$('downloadWebp').onclick=()=>{if(prepared){download(prepared.webp,prepared.webpName);status('WebP download requested: '+prepared.webpName+'. Confirm it appears in Files → Downloads.')}};
+$('downloadJson').onclick=()=>{if(prepared){download(prepared.json,prepared.jsonName);status('JSON download requested: '+prepared.jsonName+'. Confirm it appears in Files → Downloads.')}};
+$('exportSize').addEventListener('change',invalidateExport);
 $('save').onclick=()=>{if(!frames.length){status('Add frames before saving');return}const project={format:'game-graphics-workshop-animation',version:1,canvas:{width:W,height:H},fps:Number($('fps').value),frames:frames.map(({name,data,x,y})=>({name,data,x,y}))};const blob=new Blob([JSON.stringify(project)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='workshop-animation.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);status('Editable project download prepared')};
 $('project').addEventListener('change',async e=>{const file=e.target.files&&e.target.files[0];if(!file)return;pause();try{const p=JSON.parse(await file.text());if(p.format!=='game-graphics-workshop-animation'||p.version!==1||p.canvas?.width!==W||p.canvas?.height!==H||!Number.isInteger(p.fps)||p.fps<1||p.fps>12||!Array.isArray(p.frames)||p.frames.length>100)throw Error('Unsupported project');
 const restored=[];for(const f of p.frames){if(!f||typeof f.name!=='string'||typeof f.data!=='string'||!f.data.startsWith('data:image/')||![f.x,f.y].every(Number.isFinite)||f.x<0||f.x>W||f.y<0||f.y>H)throw Error('Invalid frame');restored.push({...f,im:await decode(f.data)})}
-frames=restored;selected=0;$('fps').value=p.fps;$('speed').textContent=p.fps+' FPS';refresh();status('Restored '+frames.length+' frames')}catch(err){status('Open failed: '+err.message)}finally{e.target.value=''}});
+invalidateExport();frames=restored;selected=0;$('fps').value=p.fps;$('speed').textContent=p.fps+' FPS';refresh();status('Restored '+frames.length+' frames')}catch(err){status('Open failed: '+err.message)}finally{e.target.value=''}});
 refresh();
 })();
 </script></body></html>
