@@ -20,7 +20,7 @@ async function inputs(){
  if(af){ani=await readJson(jf);if(ani.format!=='game-graphics-animation'||ani.version!==1||ani.layout!=='horizontal')throw Error('Animation JSON is not a supported Workshop export.');
  for(const k of ['frameWidth','frameHeight','frameCount','fps'])if(!Number.isInteger(ani[k])||ani[k]<1)throw Error('Invalid animation '+k);
  if(ani.frameCount*ani.frameWidth>4096||ani.frameCount>32||ani.fps>60)throw Error('Animation dimensions or speed exceed verification limits.');
- if(ani.asset!==af.name)throw Error('Animation WebP filename does not match JSON asset field.');
+ // Exported filenames can change when Safari downloads duplicates; verify actual frame dimensions instead.
  strip=await bitmap(fileUrl(af));if(strip.naturalWidth!==ani.frameCount*ani.frameWidth||strip.naturalHeight!==ani.frameHeight)throw Error('WebP dimensions do not match JSON frame metadata.');
  uploaded=true;
  }
