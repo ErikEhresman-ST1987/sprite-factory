@@ -26,7 +26,7 @@ async function inputs(){
  }
  if(sf){place=await readJson(sf);if(place.format!=='game-graphics-placement'||place.version!==1||!place.canvas||!Array.isArray(place.objects))throw Error('Placement JSON is not a supported Workshop export.');
  const {width,height}=place.canvas;if(!Number.isInteger(width)||!Number.isInteger(height)||width<100||height<100||width>4096||height>4096)throw Error('Invalid scene dimensions.');
- if(place.objects.length>100)throw Error('Too many scene objects for verification.');
+ if(place.objects.length>100)throw Error('Too many scene objects for verification.');if(place.hotspots!==undefined){if(!Array.isArray(place.hotspots)||place.hotspots.length>100)throw Error('Invalid scene hotspots.');for(const h of place.hotspots){if(!h||typeof h.id!=='string'||typeof h.action!=='string'||![h.x,h.y,h.width,h.height].every(validNumber)||h.width<=0||h.height<=0)throw Error('Invalid hotspot in placement JSON.')}}
  const available=new Map(images.map(f=>[f.name,f]));sceneArt={};
  for(const o of place.objects){if(![o.x,o.y,o.width,o.height,o.rotation,o.layer].every(validNumber)||o.width<=0||o.height<=0||!o.touchZone)throw Error('Invalid scene object: '+o.name);
  const z=o.touchZone;if(z.type!=='rectangle'||![z.x,z.y,z.width,z.height].every(validNumber)||z.width<=0||z.height<=0)throw Error('Invalid touch zone: '+o.name);
@@ -52,8 +52,8 @@ async function run(){
  for(const o of objects){const sp=new PIXI.Sprite(textures[o.asset]);sp.anchor.set(.5);sp.position.set(o.x,o.y);sp.width=o.width;sp.height=o.height;sp.rotation=o.rotation*Math.PI/180;app.stage.addChild(sp)}
  const stripTexture=PIXI.Texture.from(strip),frames=[];for(let i=0;i<ani.frameCount;i++)frames.push(new PIXI.Texture({source:stripTexture.source,frame:new PIXI.Rectangle(i*ani.frameWidth,0,ani.frameWidth,ani.frameHeight)}));
  const animated=new PIXI.AnimatedSprite(frames);animated.anchor.set(.5);animated.position.set(w*.78,h*.45);animated.width=Math.min(ani.frameWidth,w*.2);animated.height=animated.width*ani.frameHeight/ani.frameWidth;animated.animationSpeed=ani.fps/60;animated.loop=ani.loop!==false;animated.play();app.stage.addChild(animated);
- const z=objects[0]?.touchZone;if(z)zoneGraphicPixi(PIXI,app,z,()=>status('PASS: PixiJS touch zone tapped. '+(uploaded?'Uploaded assets':'Sample assets')+' rendered.'));
- status('PixiJS rendered '+(uploaded?'uploaded files':'sample assets')+'. Tap the orange zone to verify interaction.');
+ const z=objects[0]?.touchZone;if(z)zoneGraphicPixi(PIXI,app,z,()=>status('PASS: PixiJS sprite touch zone tapped.'));for(const h of place.hotspots||[]){const hit=new PIXI.Graphics().rect(h.x,h.y,h.width,h.height).fill({color:0xffffff,alpha:0.001});hit.eventMode='static';hit.hitArea=new PIXI.Rectangle(h.x,h.y,h.width,h.height);hit.on('pointertap',()=>status('PASS: PixiJS invisible hotspot '+h.id+' → '+h.action));app.stage.addChild(hit)}
+ status('PixiJS rendered '+(uploaded?'uploaded files':'sample assets')+'. Tap the orange sprite zone or an invisible background hotspot to verify interaction.');
  cleanup=()=>app.destroy(true);
  }else{
  const Phaser=await load('https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js','Phaser');if(id!==token)return;
@@ -65,7 +65,7 @@ async function run(){
  this.anims.create({key:'demo',frames:this.anims.generateFrameNumbers('demo-strip',{start:0,end:ani.frameCount-1}),frameRate:ani.fps,repeat:ani.loop===false?0:-1});
  const a=this.add.sprite(w*.78,h*.45,'demo-strip').play('demo');a.setDisplaySize(Math.min(ani.frameWidth,w*.2),Math.min(ani.frameWidth,w*.2)*ani.frameHeight/ani.frameWidth);
  const z=objects[0]?.touchZone;if(z)this.add.rectangle(z.x,z.y,z.width,z.height).setOrigin(0).setStrokeStyle(3,0xffb547).setInteractive().setDepth(999).on('pointerdown',()=>status('PASS: Phaser touch zone tapped. '+(uploaded?'Uploaded assets':'Sample assets')+' rendered.'));
- status('Phaser rendered '+(uploaded?'uploaded files':'sample assets')+'. Tap the orange zone to verify interaction.');
+ for(const h of place.hotspots||[]){this.add.zone(h.x,h.y,h.width,h.height).setOrigin(0).setInteractive().setDepth(1000).on('pointerdown',()=>status('PASS: Phaser invisible hotspot '+h.id+' → '+h.action))}status('Phaser rendered '+(uploaded?'uploaded files':'sample assets')+'. Tap the orange sprite zone or an invisible background hotspot to verify interaction.');
  }}});
  cleanup=()=>game.destroy(true);
  }
