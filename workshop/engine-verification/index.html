@@ -24,21 +24,21 @@ async function inputs(){
  strip=await bitmap(fileUrl(af));if(strip.naturalWidth!==ani.frameCount*ani.frameWidth||strip.naturalHeight!==ani.frameHeight)throw Error('WebP dimensions: '+strip.naturalWidth+' × '+strip.naturalHeight+'; JSON expects: '+(ani.frameCount*ani.frameWidth)+' × '+ani.frameHeight+' ('+ani.frameCount+' frames, '+ani.frameWidth+' × '+ani.frameHeight+' each). Check that both files are from the same export.');
  uploaded=true;
  }
- if(sf){place=await readJson(sf);if(place.format!=='game-graphics-placement'||place.version!==1||!place.canvas||!Array.isArray(place.objects))throw Error('Placement JSON is not a supported Workshop export.');
+ if(sf){place=await readJson(sf);if(place.format!=='game-graphics-placement'||place.version!==1||!place.canvas||!Array.isArray(place.objects))throw Error(place?.format==='game-graphics-workshop-scene'?'This is an editable Scene Editor project. In Scene Editor, choose Export game placement JSON, then select game-placement.json here.':'Unsupported placement JSON. Select the file created by Export game placement JSON in Scene Editor.');
  const {width,height}=place.canvas;if(!Number.isInteger(width)||!Number.isInteger(height)||width<100||height<100||width>4096||height>4096)throw Error('Invalid scene dimensions.');
- if(place.objects.length>100)throw Error('Too many scene objects for verification.');if(place.hotspots!==undefined){if(!Array.isArray(place.hotspots)||place.hotspots.length>100)throw Error('Invalid scene hotspots.');for(const h of place.hotspots){if(!h||typeof h.id!=='string'||typeof h.action!=='string'||![h.x,h.y,h.width,h.height].every(validNumber)||h.width<=0||h.height<=0)throw Error('Invalid hotspot in placement JSON.')}}
+ if(place.objects.length>100)throw Error('Too many scene objects for verification.');if(place.hotspots!==undefined){if(!Array.isArray(place.hotspots)||place.hotspots.length>100)throw Error('Invalid scene hotspots.');for(const h of place.hotspots){if(!h||typeof h.id!=='string'||typeof h.action!=='string'||![h.x,h.y,h.width,h.height].every(validNumber)||h.width<=0||h.height<=0||h.x<0||h.y<0||h.x+h.width>width+1||h.y+h.height>height+1)throw Error('Invalid hotspot in placement JSON.')}}
  const available=new Map(images.map(f=>[f.name,f]));sceneArt={};
  for(const o of place.objects){if(![o.x,o.y,o.width,o.height,o.rotation,o.layer].every(validNumber)||o.width<=0||o.height<=0||!o.touchZone)throw Error('Invalid scene object: '+o.name);
  const z=o.touchZone;if(z.type!=='rectangle'||![z.x,z.y,z.width,z.height].every(validNumber)||z.width<=0||z.height<=0)throw Error('Invalid touch zone: '+o.name);
  const filename=String(o.asset||'').split('/').pop(),f=available.get(filename)||available.get(o.name);
- if(!f)throw Error('Missing scene image: '+filename+'. Select it under Scene images.');
+ if(!f)throw Error('Missing scene image: '+filename+'. Under Scene images, select the original artwork file(s). The placement JSON contains positions, not image pixels.');
  if(!sceneArt[o.asset])sceneArt[o.asset]=await bitmap(fileUrl(f));
  }
  uploaded=true;
  }
  return {ani,strip,place,sceneArt,uploaded};
 }
-function zoneGraphicPixi(PIXI,app,z,onTap){const shape=new PIXI.Graphics().rect(z.x,z.y,z.width,z.height).stroke({width:3,color:0xffb547});shape.eventMode='static';shape.hitArea=new PIXI.Rectangle(z.x,z.y,z.width,z.height);shape.on('pointertap',onTap);app.stage.addChild(shape)}
+function zoneGraphicPixi(PIXI,app,z,onTap){const shape=new PIXI.Graphics().rect(0,0,z.width,z.height).stroke({width:3,color:0xffb547});shape.position.set(z.x,z.y);shape.eventMode='static';shape.hitArea=new PIXI.Rectangle(0,0,z.width,z.height);shape.on('pointertap',onTap);app.stage.addChild(shape)}
 async function run(){
  const id=++token;cleanup();cleanup=()=>{};clearUrls();$('view').replaceChildren();$('hotspotInfo').textContent='';status('Reading files and loading engine…');
  try{
