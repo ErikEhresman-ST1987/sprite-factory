@@ -1,12 +1,12 @@
 # Game Graphics Workshop — Export Contract v1 (Increment 4A)
 
-Status: **provisional until a game import and iPad verification pass**. This is a contract for exports, not a claim that Little Field Farm already imports them.
+Status: **Workshop-to-engine verification accepted on iPad** for sprite placement, animation playback, and background hotspots in PixiJS v8 and Phaser 3. This is a contract for exports, not a claim that Little Field Farm already imports them.
 
 ## Scene placement JSON (existing exporter; format `game-graphics-placement`, version 1)
 
 - `canvas.width` and `canvas.height`: positive integer scene dimensions in logical pixels. These are not the editor's displayed CSS pixels.
 - `background`: asset path string or null. Current exporter emits `REPLACE_WITH_GAME_BACKGROUND_ASSET_PATH` until replaced by the game developer.
-- `objects`: ordered back-to-front. Each object has `id`, `name`, `asset`, `x`, `y`, `width`, `height`, `rotation`, `layer`, and `touchZone`.
+- `hotspots`: zero or more background-only interactive rectangles with stable `id`, editable `name`, `action` (interaction key), `x`, `y`, `width`, `height`, and `type: "rectangle"`. Coordinates are scene pixels, top-left based. These areas are **invisible in gameplay**; Scene Editor and optional engine diagnostics can display outlines. The game must map `action` to behavior.\n- `objects`: ordered back-to-front. Each object has `id`, `name`, `asset`, `x`, `y`, `width`, `height`, `rotation`, `layer`, and `touchZone`.
 - `x`, `y`: **center** of sprite in scene coordinates, origin at top left, x rightward, y downward.
 - `width`, `height`: displayed sprite size in scene pixels, prior to rotation.
 - `rotation`: **degrees clockwise** in canvas screen coordinates. Convert to radians for PixiJS: `rotation * Math.PI / 180`.
@@ -36,8 +36,8 @@ The filename and numbers above are examples. Each frame occupies `[index * frame
 
 ## Compatibility and boundaries
 
-- Editable scene projects (`game-graphics-workshop-scene`, version 1/2) and editable animation projects (`game-graphics-workshop-animation`, version 1) are **not** game placement exports. Keep them for future edits.
+- Editable scene projects (`game-graphics-workshop-scene`, version 1/2/3) and editable animation projects (`game-graphics-workshop-animation`, version 1) are **not** game placement exports. Keep them for future edits.
 - Scene dimensions currently range 100–4096 in each axis. Animation cell sizes are 128/256/512 and total strip width <= 4096.
 - No automatic sprite/animation attachment, no polygon hit zones, no built-in game loader, and no multi-row atlas support.
 - The iPad WebP encoder may use a network-loaded WebAssembly fallback; offline fallback encoding is not guaranteed.
-- Before acceptance: test two-file downloads on iPad Safari, confirm JSON values and WebP dimensions, and verify placement in a PixiJS v8 sandbox. Do not modify the working Little Field Farm game just to perform this test.
+- Completed iPad acceptance: WebP and JSON downloads, animation playback, scene placement, and sprite/background hotspot interactions in PixiJS v8 and Phaser 3. Full scene-background asset integration in the game remains unverified. Do not modify the working Little Field Farm game just to perform this test.
