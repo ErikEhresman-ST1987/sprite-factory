@@ -2,6 +2,23 @@
 
 A browser-based graphics preparation workshop for game assets, developed primarily for **Little Field Farm** and tested in iPad Safari. Import PNG, JPG, or WebP artwork; inspect a preview; export verified WebP assets. This README documents the production state through **Increment 11F (accepted and merged, October 2026)**.
 
+## Game Graphics Workshop — current development branch
+
+The original Sprite Factory is now joined by three independently accessible tools in the **Game Graphics Workshop**:
+
+- **[Workshop Home](workshop/index.html)** — entry point for all four tools.
+- **[Scene Editor](workshop/scene-editor/index.html)** — background and sprite composition, sprite touch zones, invisible background hotspots, editable scene projects, and game placement JSON.
+- **[Animation Studio](workshop/animation-studio/index.html)** — individual-frame alignment, preview, editable projects, and separately downloadable WebP strips and matching JSON metadata.
+- **[Engine Verification](workshop/engine-verification/index.html)** — isolated PixiJS v8 / Phaser 3 checks using actual Workshop exports.
+
+See **[Workshop Workflow](workshop/WORKFLOW.md)** for exact steps, file types, revision procedure, and troubleshooting; **[Export Contract](workshop/EXPORT-CONTRACT-v1.md)** for formats; and **[4B Regression Checklist](workshop/RELIABILITY-REGRESSION-4B.md)** for repeatable tests.
+
+**Acceptance:** Increments 4A, 4A.1, and 4B passed user testing on iPad Safari. This does **not** mean the Workshop is merged into `main` or that Little Field Farm already imports its exports. The working recovery branch is `backup/workshop-4a1-accepted-20261026`.
+
+The detailed Sprite Factory instructions below remain applicable to the original processing tool.
+
+---
+
 ## Purpose and scope
 
 Sprite Factory prepares finished illustrations for use in games. It does not generate artwork, paint new details, or author arbitrary multi-row animation atlases. Its three processing modes are **Sprite**, **Background**, and **Sprite Sheet**. The interface is designed for a simple import → configure → preview → download workflow. Source images are processed in the browser.

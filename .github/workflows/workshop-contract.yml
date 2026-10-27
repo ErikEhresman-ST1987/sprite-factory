@@ -1,0 +1,23 @@
+name: Workshop contract checks
+on:
+  pull_request:
+    paths:
+      - 'workshop/**'
+      - 'tests/workshop-contract.test.mjs'
+      - '.github/workflows/workshop-contract.yml'
+  push:
+    branches:
+      - development/workshop-home-increment-1
+    paths:
+      - 'workshop/**'
+      - 'tests/workshop-contract.test.mjs'
+      - '.github/workflows/workshop-contract.yml'
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/workshop-contract.test.mjs

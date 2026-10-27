@@ -1,0 +1,81 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Engine Export Verification · Workshop</title><style>body{margin:0;background:#111821;color:#eef3f8;font:16px system-ui;padding:18px}main{max-width:900px;margin:auto}button,select,input{font:inherit;padding:10px;background:#294459;color:white;border:1px solid #789;border-radius:8px;min-height:44px}#view{max-width:100%;overflow:auto;background:#273544;border-radius:10px;margin:12px 0}#view canvas{max-width:100%;height:auto;touch-action:manipulation}a{color:#a6e1d0}pre{white-space:pre-wrap}label{display:inline-block;margin:7px 12px 7px 0}input[type=file]{display:block;max-width:280px;font-size:14px}section{border:1px solid #607d90;padding:12px;border-radius:10px;margin:16px 0}h2{font-size:19px}</style></head><body><main><a href="../index.html">← Workshop Home</a><h1>Engine export verification</h1><p>This isolated sample tests the same engine-neutral placement and animation metadata in PixiJS v8 and Phaser 3. It does not modify Little Field Farm.</p><section><h2>Optional: test your exported files</h2><p>Choose the WebP sprite strip and its matching animation JSON. For scene placement, choose the game-placement JSON, then select the actual sprite image files named in that JSON. If the placement references a background, also choose its original background image. The sample test still works without uploads. Backgrounds are scaled to the exported logical canvas; check that this matches the intended composition.</p><label>Animation WebP <input id="animWebp" type="file" accept=".webp,image/webp"></label><label>Animation JSON <input id="animJson" type="file" accept=".json,application/json"></label><label>Placement JSON <input id="sceneJson" type="file" accept=".json,application/json"></label><label>Scene background <input id="sceneBackground" type="file" accept="image/*"></label><label>Scene images <input id="sceneImages" type="file" accept="image/*" multiple></label><button id="clear">Clear selected files</button></section><label>Engine <select id="engine"><option value="pixi">PixiJS v8</option><option value="phaser">Phaser 3</option></select></label><button id="run">Run verification</button><label><input id="debugHotspots" type="checkbox"> Show hotspot outlines for testing only</label><div id="view"></div><pre id="hotspotInfo"></pre><pre id="status" role="status">Select an engine and run. Requires internet for engine libraries.</pre><p>Expected: two colored objects, an animated four-frame object, and a clickable/tappable rectangle. Tap the orange zone to verify hit-testing. Scene dimensions are 640 × 360; the rendering view may scale on iPad.</p></main><script>
+(()=>{
+const $=id=>document.getElementById(id),status=s=>$('status').textContent=s;
+const placement={format:'game-graphics-placement',version:1,canvas:{width:640,height:360},background:null,objects:[{id:'sprite_1',name:'Sample',asset:'sample',x:190,y:170,width:110,height:100,rotation:18,layer:0,touchZone:{type:'rectangle',x:125,y:115,width:130,height:110}},{id:'sprite_2',name:'Top layer',asset:'sample2',x:300,y:180,width:85,height:85,rotation:0,layer:1,touchZone:{type:'rectangle',x:270,y:140,width:90,height:90}}]};
+const animation={format:'game-graphics-animation',version:1,asset:'demo-strip',frameWidth:64,frameHeight:64,frameCount:4,fps:6,layout:'horizontal',loop:true};
+
+let cleanup=()=>{},token=0,urls=[];
+function clearUrls(){for(const u of urls)URL.revokeObjectURL(u);urls=[]}
+function fileUrl(f){const u=URL.createObjectURL(f);urls.push(u);return u}
+function load(src,globalName){return new Promise((resolve,reject)=>{if(window[globalName])return resolve(window[globalName]);const script=document.createElement('script');script.src=src;script.onload=()=>window[globalName]?resolve(window[globalName]):reject(Error(globalName+' unavailable'));script.onerror=()=>reject(Error('Unable to load '+globalName+' (network required)'));document.head.append(script)})}
+function art(){const c=document.createElement('canvas');c.width=256;c.height=64;const x=c.getContext('2d');for(let i=0;i<4;i++){x.fillStyle=['#b7e7aa','#ffd58b','#9dd8ff','#f6a5ba'][i];x.fillRect(i*64+7,7,50,50);x.fillStyle='#294459';x.fillRect(i*64+18+i*3,24,9,9)}return c}
+function square(color){const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d');x.fillStyle=color;x.fillRect(2,2,60,60);return c}
+async function readJson(f){let data;try{data=JSON.parse(await f.text())}catch{throw Error('Could not read JSON: '+f.name)}return data}
+async function bitmap(src){return new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=()=>reject(Error('Could not open image: '+src));im.src=src})}
+function validNumber(n){return typeof n==='number'&&Number.isFinite(n)}
+async function inputs(){
+ const af=$('animWebp').files[0],jf=$('animJson').files[0],sf=$('sceneJson').files[0],images=[...$('sceneImages').files],backgroundFile=$('sceneBackground').files[0];
+ if(Boolean(af)!==Boolean(jf))throw Error('Choose both the animation WebP and matching JSON, or neither.');
+ let ani=animation,strip=art(),place=placement,sceneArt={sample:square('#83cba6'),sample2:square('#ffd18a')},uploaded=false,backgroundImage=null;
+ if(af){ani=await readJson(jf);if(ani.format!=='game-graphics-animation'||ani.version!==1||ani.layout!=='horizontal')throw Error('Animation JSON is not a supported Workshop export.');
+ for(const k of ['frameWidth','frameHeight','frameCount','fps'])if(!Number.isInteger(ani[k])||ani[k]<1)throw Error('Invalid animation '+k);
+ if(ani.frameCount*ani.frameWidth>4096||ani.frameCount>32||ani.fps>60)throw Error('Animation dimensions or speed exceed verification limits.');
+ // Exported filenames can change when Safari downloads duplicates; verify actual frame dimensions instead.
+ strip=await bitmap(fileUrl(af));if(strip.naturalWidth!==ani.frameCount*ani.frameWidth||strip.naturalHeight!==ani.frameHeight)throw Error('WebP dimensions: '+strip.naturalWidth+' × '+strip.naturalHeight+'; JSON expects: '+(ani.frameCount*ani.frameWidth)+' × '+ani.frameHeight+' ('+ani.frameCount+' frames, '+ani.frameWidth+' × '+ani.frameHeight+' each). Check that both files are from the same export.');
+ uploaded=true;
+ }
+ if(sf){place=await readJson(sf);if(place.format!=='game-graphics-placement'||place.version!==1||!place.canvas||!Array.isArray(place.objects))throw Error(place?.format==='game-graphics-workshop-scene'?'This is an editable Scene Editor project. In Scene Editor, choose Export game placement JSON, then select game-placement.json here.':'Unsupported placement JSON. Select the file created by Export game placement JSON in Scene Editor.');
+ const {width,height}=place.canvas;if(!Number.isInteger(width)||!Number.isInteger(height)||width<100||height<100||width>4096||height>4096)throw Error('Invalid scene dimensions.');
+ if(place.objects.length>100)throw Error('Too many scene objects for verification.');if(place.hotspots!==undefined){if(!Array.isArray(place.hotspots)||place.hotspots.length>100)throw Error('Invalid scene hotspots.');for(const h of place.hotspots){if(!h||typeof h.id!=='string'||typeof h.action!=='string'||![h.x,h.y,h.width,h.height].every(validNumber)||h.width<=0||h.height<=0||h.x<0||h.y<0||h.x+h.width>width+1||h.y+h.height>height+1)throw Error('Invalid hotspot in placement JSON.')}}
+ const available=new Map(images.map(f=>[f.name,f]));sceneArt={};
+ for(const o of place.objects){if(![o.x,o.y,o.width,o.height,o.rotation,o.layer].every(validNumber)||o.width<=0||o.height<=0||!o.touchZone)throw Error('Invalid scene object: '+o.name);
+ const z=o.touchZone;if(z.type!=='rectangle'||![z.x,z.y,z.width,z.height].every(validNumber)||z.width<=0||z.height<=0)throw Error('Invalid touch zone: '+o.name);
+ const filename=String(o.asset||'').split('/').pop(),f=available.get(filename)||available.get(o.name);
+ if(!f)throw Error('Missing scene image: '+filename+'. Under Scene images, select the original artwork file(s). The placement JSON contains positions, not image pixels.');
+ if(!sceneArt[o.asset])sceneArt[o.asset]=await bitmap(fileUrl(f));
+ }
+ if(place.background){if(!backgroundFile)throw Error('Missing scene background. Under Scene background, select the original background artwork. Placement JSON stores a path, not image pixels.');backgroundImage=await bitmap(fileUrl(backgroundFile));}
+ uploaded=true;
+ }
+ return {ani,strip,place,sceneArt,uploaded,backgroundImage};
+}
+function zoneGraphicPixi(PIXI,app,z,onTap){const shape=new PIXI.Graphics().rect(0,0,z.width,z.height).stroke({width:3,color:0xffb547});shape.position.set(z.x,z.y);shape.eventMode='static';shape.hitArea=new PIXI.Rectangle(0,0,z.width,z.height);shape.on('pointertap',onTap);app.stage.addChild(shape)}
+async function run(){
+ const id=++token;cleanup();cleanup=()=>{};clearUrls();$('view').replaceChildren();$('hotspotInfo').textContent='';status('Reading files and loading engine…');
+ try{
+ const {ani,strip,place,sceneArt,uploaded,backgroundImage}=await inputs();if(id!==token)return;const hotspots=place.hotspots||[];$('hotspotInfo').textContent=hotspots.length?'Export contains '+hotspots.length+' background hotspot(s): '+hotspots.map(h=>h.name+' ['+h.id+'] '+h.action+' at ('+h.x+', '+h.y+') '+h.width+'×'+h.height).join('; '):'Export contains ZERO background hotspots. Re-export from the updated Scene Editor.';
+ const w=place.canvas.width,h=place.canvas.height,objects=[...place.objects].sort((a,b)=>a.layer-b.layer);
+ if($('engine').value==='pixi'){
+ const PIXI=await load('https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.js','PIXI');if(id!==token)return;
+ const app=new PIXI.Application();await app.init({width:w,height:h,background:'#344756',resolution:1});if(id!==token){app.destroy(true);return}
+ $('view').append(app.canvas);
+ if(backgroundImage){const bg=new PIXI.Sprite(PIXI.Texture.from(backgroundImage));bg.position.set(0,0);bg.width=w;bg.height=h;app.stage.addChild(bg)}
+ const textures={};for(const [key,img] of Object.entries(sceneArt))textures[key]=PIXI.Texture.from(img);
+ for(const o of objects){const sp=new PIXI.Sprite(textures[o.asset]);sp.anchor.set(.5);sp.position.set(o.x,o.y);sp.width=o.width;sp.height=o.height;sp.rotation=o.rotation*Math.PI/180;app.stage.addChild(sp)}
+ const stripTexture=PIXI.Texture.from(strip),frames=[];for(let i=0;i<ani.frameCount;i++)frames.push(new PIXI.Texture({source:stripTexture.source,frame:new PIXI.Rectangle(i*ani.frameWidth,0,ani.frameWidth,ani.frameHeight)}));
+ const animated=new PIXI.AnimatedSprite(frames);animated.anchor.set(.5);animated.position.set(w*.78,h*.45);animated.width=Math.min(ani.frameWidth,w*.2);animated.height=animated.width*ani.frameHeight/ani.frameWidth;animated.animationSpeed=ani.fps/60;animated.loop=ani.loop!==false;animated.play();app.stage.addChild(animated);
+ const z=objects[0]?.touchZone;if(z)zoneGraphicPixi(PIXI,app,z,()=>status('PASS: PixiJS sprite touch zone tapped.'));for(const h of place.hotspots||[]){const hit=new PIXI.Graphics().rect(0,0,h.width,h.height).fill({color:0x4dcdf2,alpha:$('debugHotspots').checked?.18:.001});hit.position.set(h.x,h.y);hit.eventMode='static';hit.cursor='pointer';hit.hitArea=new PIXI.Rectangle(0,0,h.width,h.height);if($('debugHotspots').checked)hit.rect(0,0,h.width,h.height).stroke({width:3,color:0x4dcdf2});hit.on('pointertap',()=>status('PASS: PixiJS invisible hotspot '+h.id+' → '+h.action));app.stage.addChild(hit)}
+ status('PixiJS rendered '+(uploaded?'uploaded files':'sample assets')+'. Tap the orange sprite zone or an invisible background hotspot to verify interaction.');
+ cleanup=()=>app.destroy(true);
+ }else{
+ const Phaser=await load('https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js','Phaser');if(id!==token)return;
+ const game=new Phaser.Game({type:Phaser.CANVAS,parent:'view',width:w,height:h,backgroundColor:'#344756',scale:{mode:Phaser.Scale.NONE},scene:{create(){try{
+ if(backgroundImage){const bc=document.createElement('canvas');bc.width=backgroundImage.naturalWidth;bc.height=backgroundImage.naturalHeight;bc.getContext('2d').drawImage(backgroundImage,0,0);this.textures.addCanvas('scene-background',bc);this.add.image(0,0,'scene-background').setOrigin(0).setDisplaySize(w,h).setDepth(-1000)}
+ const keyMap=new Map();let index=0;for(const [key,img] of Object.entries(sceneArt)){const id='scene_'+index++;const sourceCanvas=document.createElement('canvas');sourceCanvas.width=img.naturalWidth||img.width;sourceCanvas.height=img.naturalHeight||img.height;sourceCanvas.getContext('2d').drawImage(img,0,0);this.textures.addCanvas(id,sourceCanvas);keyMap.set(key,id)}
+ const stripCanvas=document.createElement('canvas');stripCanvas.width=strip.width||strip.naturalWidth;stripCanvas.height=strip.height||strip.naturalHeight;stripCanvas.getContext('2d').drawImage(strip,0,0);
+ this.textures.addSpriteSheet('demo-strip',stripCanvas,{frameWidth:ani.frameWidth,frameHeight:ani.frameHeight});
+ for(const o of objects)this.add.image(o.x,o.y,keyMap.get(o.asset)).setDisplaySize(o.width,o.height).setAngle(o.rotation).setDepth(o.layer);
+ this.anims.create({key:'demo',frames:this.anims.generateFrameNumbers('demo-strip',{start:0,end:ani.frameCount-1}),frameRate:ani.fps,repeat:ani.loop===false?0:-1});
+ const a=this.add.sprite(w*.78,h*.45,'demo-strip').play('demo');a.setDisplaySize(Math.min(ani.frameWidth,w*.2),Math.min(ani.frameWidth,w*.2)*ani.frameHeight/ani.frameWidth);
+ const z=objects[0]?.touchZone;if(z)this.add.rectangle(z.x,z.y,z.width,z.height).setOrigin(0).setStrokeStyle(3,0xffb547).setInteractive().setDepth(999).on('pointerdown',()=>status('PASS: Phaser touch zone tapped. '+(uploaded?'Uploaded assets':'Sample assets')+' rendered.'));
+ for(const h of place.hotspots||[]){const z=this.add.zone(h.x,h.y,h.width,h.height).setOrigin(0).setInteractive().setDepth(1000).on('pointerdown',()=>status('PASS: Phaser invisible hotspot '+h.id+' → '+h.action));if($('debugHotspots').checked)this.add.rectangle(h.x,h.y,h.width,h.height,0x4dcdf2,.18).setOrigin(0).setStrokeStyle(3,0x4dcdf2).setDepth(998)}status('Phaser rendered '+(uploaded?'uploaded files':'sample assets')+' with '+hotspots.length+' hotspots.');}catch(e){status('Phaser scene error: '+e.message);throw e}
+ }}});
+ cleanup=()=>game.destroy(true);setTimeout(()=>{if(id===token&&$('status').textContent==='Reading files and loading engine…')status('Phaser did not finish starting. Try a smaller scene (800 × 600) or PixiJS; report this message.');},5000);
+ }
+ }catch(e){status('Verification error: '+e.message)}
+}
+$('run').onclick=run;
+$('clear').onclick=()=>{for(const k of ['animWebp','animJson','sceneJson','sceneImages','sceneBackground'])$(k).value='';status('Selected files cleared. Sample verification available.')};
+
+})();
+</script></body></html>

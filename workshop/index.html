@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#17202b">
+<title>Game Graphics Workshop</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}
+body{margin:0;background:#111821;color:#eef3f8;font:16px system-ui,-apple-system,sans-serif;line-height:1.5}
+main{max-width:800px;margin:auto;padding:30px 16px 56px}
+h1{font-size:clamp(28px,5vw,40px);margin:0 0 6px}p{margin:0}.intro{color:#aebbc9;margin-bottom:28px}
+.tools{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.tool{background:#192431;border:1px solid #334354;border-radius:16px;padding:22px;display:flex;flex-direction:column;gap:12px;min-height:220px}
+.tool h2{font-size:21px;margin:0}.tool p{color:#b9c6d3;flex:1}
+a.launch{display:block;text-align:center;padding:12px 16px;border-radius:10px;background:#80c7ad;color:#10211d;font-weight:700;text-decoration:none;min-height:46px}
+a.launch:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.status{font-size:13px;color:#aebbc9}.future{opacity:.78}
+footer{color:#aebbc9;font-size:13px;margin-top:26px}
+</style>
+</head>
+<body><main>
+<header><h1>Game Graphics Workshop</h1><p class="intro">Choose a tool. Each workspace operates independently.</p></header>
+<section class="tools" aria-label="Graphics tools">
+<article class="tool"><h2>Sprite Factory</h2><p>Prepare transparent sprites, backgrounds, and animation sheets for your games.</p><a class="launch" href="../index.html">Open Sprite Factory</a><span class="status">Available now</span></article>
+<article class="tool"><h2>Scene Editor</h2><p>Compose backgrounds and sprites, add invisible gameplay hotspots, save editable scenes, and export placement JSON.</p><a class="launch" href="scene-editor/index.html">Open Scene Editor</a><span class="status">iPad-verified workflow</span></article>
+<article class="tool"><h2>Animation Studio</h2><p>Align individual animation frames, preview movement, and refine the result.</p><a class="launch" href="animation-studio/index.html">Open Animation Studio</a><span class="status">iPad-verified WebP + JSON export</span></article>
+<article class="tool"><h2>Engine Verification</h2><p>Test real exported scene and animation files in PixiJS v8 and Phaser 3, including invisible hotspots.</p><a class="launch" href="engine-verification/index.html">Open Engine Verification</a><span class="status">Diagnostic tool · does not modify games</span></article>
+</section>
+<p style="margin-top:24px"><a href="WORKFLOW.md" style="color:#80c7ad">Workshop workflow and file guide</a></p>
+<footer>Workshop tools run in the browser. Keep editable project files and exported game files separately. Sprite Factory remains at its existing address.</footer>
+</main></body></html>
