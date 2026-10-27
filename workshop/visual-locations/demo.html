@@ -1,5 +1,60 @@
-<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Visual Locations Integration Smoke Test</title><style>body{font:16px system-ui;margin:20px auto;max-width:800px;padding:0 14px;background:#f7f7f2;color:#222}button{font:inherit;padding:12px;margin:5px;min-height:44px}canvas{width:100%;background:white;border:1px solid #888;touch-action:manipulation}#result{white-space:pre-wrap}</style><h1>Visual Locations integration test</h1><p>Two locations must switch independently. The same adapter works with farm and construction appearances.</p><canvas id="scene" width="800" height="400"></canvas><div><button id="bed">Change bed 1</button><button id="house">Change construction site</button><button id="clear">Clear bed 1</button></div><p id="result" role="status">Loading…</p><script type="module">
-import {createVisualLocations} from './adapter.mjs';
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Visual Locations Integration Smoke Test</title><style>body{font:16px system-ui;margin:20px auto;max-width:800px;padding:0 14px;background:#f7f7f2;color:#222}button{font:inherit;padding:12px;margin:5px;min-height:44px}canvas{width:100%;background:white;border:1px solid #888;touch-action:manipulation}#result{white-space:pre-wrap}</style><h1>Visual Locations integration test</h1><p>Two locations must switch independently. The same adapter works with farm and construction appearances.</p><canvas id="scene" width="800" height="400"></canvas><div><button id="bed">Change bed 1</button><button id="house">Change construction site</button><button id="clear">Clear bed 1</button></div><p id="result" role="status">Loading…</p><p style="font-size:13px">Self-contained demo: no external modules required.</p><script>
+/* Reusable Visual Locations adapter v1. No dependencies, no game-specific rules. */
+function createVisualLocations(scene, onChange = () => {}) {
+  if (!scene || scene.format !== 'game-graphics-visual-locations' || scene.version !== 1 || !Array.isArray(scene.locations)) throw Error('Unsupported visual locations export');
+  const locations = new Map();
+  const validId = id => typeof id === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(id);
+  const rect = z => z && z.type === 'rectangle' && [z.x,z.y,z.width,z.height].every(Number.isFinite) && z.width > 0 && z.height > 0;
+  if (!Number.isSafeInteger(scene.canvas?.width) || !Number.isSafeInteger(scene.canvas?.height) || scene.canvas.width < 100 || scene.canvas.height < 100 || scene.canvas.width > 4096 || scene.canvas.height > 4096) throw Error('Invalid canvas');
+  for (const location of scene.locations) {
+    if (!validId(location.id) || locations.has(location.id) || !Array.isArray(location.choices) || !location.choices.length) throw Error('Invalid or duplicate location');
+    if (location.touchZone && (!rect(location.touchZone) || location.touchZone.x < 0 || location.touchZone.y < 0 || location.touchZone.x + location.touchZone.width > scene.canvas.width || location.touchZone.y + location.touchZone.height > scene.canvas.height)) throw Error('Invalid touch zone');
+    const choices = new Map();
+    for (const choice of location.choices) {
+      if (!validId(choice.id) || choices.has(choice.id) || !Array.isArray(choice.appearances) || !choice.appearances.length) throw Error('Invalid or duplicate choice');
+      const appearances = new Map();
+      for (const appearance of choice.appearances) {
+        if (!validId(appearance.id) || appearances.has(appearance.id) || typeof appearance.asset !== 'string' || !/^(?!\/)(?!.*\.\.)(?:[\w-]+\/)*[\w.-]+\.webp$/i.test(appearance.asset) || ![appearance.x,appearance.y,appearance.width,appearance.height,appearance.rotation,appearance.layer].every(Number.isFinite) || appearance.width <= 0 || appearance.height <= 0 || appearance.x < 0 || appearance.y < 0 || appearance.x > scene.canvas.width || appearance.y > scene.canvas.height || !Number.isSafeInteger(appearance.layer)) throw Error('Invalid appearance');
+        appearances.set(appearance.id, Object.freeze({...appearance}));
+      }
+      choices.set(choice.id, appearances);
+    }
+    locations.set(location.id, {source:location,choices,selected:null});
+  }
+  const api = {
+    canvas: Object.freeze({...scene.canvas}),
+    ids: () => [...locations.keys()],
+    getAppearance(locationId, choiceId, appearanceId) { return locations.get(locationId)?.choices.get(choiceId)?.get(appearanceId) ?? null; },
+    select(locationId, choiceId = null, appearanceId = null) {
+      const location = locations.get(locationId);
+      if (!location) throw Error('Unknown location: '+locationId);
+      if (choiceId === null && appearanceId === null) location.selected = null;
+      else {
+        const appearance = api.getAppearance(locationId,choiceId,appearanceId);
+        if (!appearance) throw Error('Unknown choice or appearance at '+locationId);
+        location.selected = {choiceId,appearanceId};
+      }
+      onChange(locationId, api.current(locationId));
+      return api.current(locationId);
+    },
+    current(locationId) {
+      const location = locations.get(locationId);
+      if (!location) throw Error('Unknown location: '+locationId);
+      const s = location.selected;
+      return s ? api.getAppearance(locationId,s.choiceId,s.appearanceId) : null;
+    },
+    visible() {
+      return [...locations].flatMap(([id,l]) => l.selected ? [{locationId:id,choiceId:l.selected.choiceId,appearanceId:l.selected.appearanceId,...api.current(id)}] : []).sort((a,b)=>a.layer-b.layer);
+    },
+    hitTest(x,y) {
+      if (![x,y].every(Number.isFinite)) return [];
+      return [...locations].filter(([,l])=>{const z=l.source.touchZone;return z && x>=z.x && x<=z.x+z.width && y>=z.y && y<=z.y+z.height}).map(([id,l])=>({locationId:id,action:l.source.action||''}));
+    }
+  };
+  return api;
+}
+
+
 const mk=(id,x,choice,states)=>({id,choices:[{id:choice,appearances:states.map((name,i)=>({id:name,asset:'assets/'+name+'.webp',x,y:190,width:130,height:100,rotation:0,layer:i+1}))}],touchZone:{type:'rectangle',x:x-65,y:140,width:130,height:100},action:'inspect-'+id});
 const scene={format:'game-graphics-visual-locations',version:1,canvas:{width:800,height:400},locations:[mk('bed-01',200,'wheat',['growing','mature']),mk('construction-01',600,'habitat',['foundation','complete'])]};
 const visuals=createVisualLocations(scene),canvas=document.getElementById('scene'),ctx=canvas.getContext('2d'),result=document.getElementById('result');let bed=0,house=0;
