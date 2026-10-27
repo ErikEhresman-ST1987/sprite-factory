@@ -1,0 +1,69 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Visual Locations Engine Verification</title><style>body{font:16px system-ui;background:#18232b;color:#fff;max-width:850px;margin:18px auto;padding:0 12px}button,select{font:inherit;padding:12px;margin:4px;min-height:44px}#view{background:#e5eee5;min-height:320px;overflow:hidden}#view canvas{max-width:100%;height:auto}#status{white-space:pre-wrap}</style><h1>Visual Locations · Engine Verification</h1><p>Real WebP textures rendered in PixiJS v8 or Phaser 3. Requires internet for engine libraries.</p><label>Engine <select id="engine"><option value="pixi">PixiJS v8</option><option value="phaser">Phaser 3</option></select></label><button id="start">Start engine</button><button id="bed" disabled>Change bed</button><button id="house" disabled>Change building</button><button id="clear" disabled>Clear bed</button><div id="view"></div><pre id="status" role="status">Choose an engine, then Start engine.</pre><script>
+/* Reusable Visual Locations adapter v1. No dependencies, no game-specific rules. */
+function createVisualLocations(scene, onChange = () => {}) {
+  if (!scene || scene.format !== 'game-graphics-visual-locations' || scene.version !== 1 || !Array.isArray(scene.locations)) throw Error('Unsupported visual locations export');
+  const locations = new Map();
+  const validId = id => typeof id === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(id);
+  const rect = z => z && z.type === 'rectangle' && [z.x,z.y,z.width,z.height].every(Number.isFinite) && z.width > 0 && z.height > 0;
+  if (!Number.isSafeInteger(scene.canvas?.width) || !Number.isSafeInteger(scene.canvas?.height) || scene.canvas.width < 100 || scene.canvas.height < 100 || scene.canvas.width > 4096 || scene.canvas.height > 4096) throw Error('Invalid canvas');
+  for (const location of scene.locations) {
+    if (!validId(location.id) || locations.has(location.id) || !Array.isArray(location.choices) || !location.choices.length) throw Error('Invalid or duplicate location');
+    if (location.touchZone && (!rect(location.touchZone) || location.touchZone.x < 0 || location.touchZone.y < 0 || location.touchZone.x + location.touchZone.width > scene.canvas.width || location.touchZone.y + location.touchZone.height > scene.canvas.height)) throw Error('Invalid touch zone');
+    const choices = new Map();
+    for (const choice of location.choices) {
+      if (!validId(choice.id) || choices.has(choice.id) || !Array.isArray(choice.appearances) || !choice.appearances.length) throw Error('Invalid or duplicate choice');
+      const appearances = new Map();
+      for (const appearance of choice.appearances) {
+        if (!validId(appearance.id) || appearances.has(appearance.id) || typeof appearance.asset !== 'string' || !/^(?!\/)(?!.*\.\.)(?:[\w-]+\/)*[\w.-]+\.webp$/i.test(appearance.asset) || ![appearance.x,appearance.y,appearance.width,appearance.height,appearance.rotation,appearance.layer].every(Number.isFinite) || appearance.width <= 0 || appearance.height <= 0 || appearance.x < 0 || appearance.y < 0 || appearance.x > scene.canvas.width || appearance.y > scene.canvas.height || !Number.isSafeInteger(appearance.layer)) throw Error('Invalid appearance');
+        appearances.set(appearance.id, Object.freeze({...appearance}));
+      }
+      choices.set(choice.id, appearances);
+    }
+    locations.set(location.id, {source:location,choices,selected:null});
+  }
+  const api = {
+    canvas: Object.freeze({...scene.canvas}),
+    ids: () => [...locations.keys()],
+    getAppearance(locationId, choiceId, appearanceId) { return locations.get(locationId)?.choices.get(choiceId)?.get(appearanceId) ?? null; },
+    select(locationId, choiceId = null, appearanceId = null) {
+      const location = locations.get(locationId);
+      if (!location) throw Error('Unknown location: '+locationId);
+      if (choiceId === null && appearanceId === null) location.selected = null;
+      else {
+        const appearance = api.getAppearance(locationId,choiceId,appearanceId);
+        if (!appearance) throw Error('Unknown choice or appearance at '+locationId);
+        location.selected = {choiceId,appearanceId};
+      }
+      onChange(locationId, api.current(locationId));
+      return api.current(locationId);
+    },
+    current(locationId) {
+      const location = locations.get(locationId);
+      if (!location) throw Error('Unknown location: '+locationId);
+      const s = location.selected;
+      return s ? api.getAppearance(locationId,s.choiceId,s.appearanceId) : null;
+    },
+    visible() {
+      return [...locations].flatMap(([id,l]) => l.selected ? [{locationId:id,choiceId:l.selected.choiceId,appearanceId:l.selected.appearanceId,...api.current(id)}] : []).sort((a,b)=>a.layer-b.layer);
+    },
+    hitTest(x,y) {
+      if (![x,y].every(Number.isFinite)) return [];
+      return [...locations].filter(([,l])=>{const z=l.source.touchZone;return z && x>=z.x && x<=z.x+z.width && y>=z.y && y<=z.y+z.height}).map(([id,l])=>({locationId:id,action:l.source.action||''}));
+    }
+  };
+  return api;
+}
+
+const $=id=>document.getElementById(id);let cleanup=()=>{},draw=()=>{},token=0,bed=0,house=0;const status=s=>$('status').textContent=s;
+const make=(id,x,choice,states)=>({id,action:'inspect-'+id,touchZone:{type:'rectangle',x:x-60,y:115,width:120,height:100},choices:[{id:choice,appearances:states.map((name,i)=>({id:name,asset:'assets/'+name+'.webp',x,y:165,width:120,height:95,rotation:i?8:0,layer:2+i}))}]});
+const scene={format:'game-graphics-visual-locations',version:1,canvas:{width:640,height:320},locations:[make('bed-01',175,'wheat',['growing','mature']),make('construction-01',465,'habitat',['foundation','complete'])]};
+const visual=createVisualLocations(scene);visual.select('bed-01','wheat','growing');visual.select('construction-01','habitat','foundation');
+async function loadScript(url,check){if(check())return;await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=url;s.onload=resolve;s.onerror=()=>reject(Error('Engine library could not load'));document.head.append(s)})}
+async function textures(){const colors={growing:'#77b74e',mature:'#ddb844',foundation:'#939aa3',complete:'#5c8ec2'};const urls={};for(const [name,color] of Object.entries(colors)){const c=document.createElement('canvas');c.width=128;c.height=96;const x=c.getContext('2d');x.fillStyle=color;x.fillRect(3,3,122,90);x.strokeStyle='#222';x.lineWidth=4;x.strokeRect(3,3,122,90);x.fillStyle='#111';x.textAlign='center';x.font='17px system-ui';x.fillText(name,64,52);const blob=await new Promise(ok=>c.toBlob(ok,'image/webp'));if(!blob||blob.type!=='image/webp')throw Error('WebP encoding unavailable');urls['assets/'+name+'.webp']=URL.createObjectURL(blob)}return urls}
+function controls(ready){for(const id of ['bed','house','clear'])$(id).disabled=!ready}
+$('bed').onclick=()=>{bed=1-bed;visual.select('bed-01','wheat',bed?'mature':'growing');draw()};$('house').onclick=()=>{house=1-house;visual.select('construction-01','habitat',house?'complete':'foundation');draw()};$('clear').onclick=()=>{visual.select('bed-01');draw()};
+$('start').onclick=async()=>{const id=++token;controls(false);try{await cleanup();$('view').replaceChildren();status('Loading engine and preparing WebP textures…');const engine=$('engine').value;await loadScript(engine==='pixi'?'https://cdn.jsdelivr.net/npm/pixi.js@8.14.3/dist/pixi.min.js':'https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js',()=>engine==='pixi'?!!window.PIXI:!!window.Phaser);const urls=await textures();if(id!==token)return;
+if(engine==='pixi'){const app=new PIXI.Application();await app.init({width:640,height:320,background:'#e5eee5'});$('view').appendChild(app.canvas);const tex={};for(const [asset,url] of Object.entries(urls))tex[asset]=await PIXI.Assets.load(url);const sprites=new Map();draw=()=>{const visible=visual.visible();for(const [key,s] of sprites)if(!visible.some(v=>v.locationId===key)){app.stage.removeChild(s);s.destroy();sprites.delete(key)}for(const item of visible){let sprite=sprites.get(item.locationId);if(!sprite){sprite=new PIXI.Sprite(tex[item.asset]);sprite.anchor.set(.5);sprites.set(item.locationId,sprite);app.stage.addChild(sprite)}sprite.texture=tex[item.asset];sprite.position.set(item.x,item.y);sprite.width=item.width;sprite.height=item.height;sprite.rotation=item.rotation*Math.PI/180;sprite.zIndex=item.layer}app.stage.sortableChildren=true;status('PASS: PixiJS rendered '+visible.length+' WebP location(s). Tap buttons to change states.')};cleanup=async()=>{app.destroy(true,{children:true});Object.values(urls).forEach(URL.revokeObjectURL)};draw()}
+else{const keyMap=new Map();let game;await new Promise((resolve,reject)=>{let settled=false;const timeout=setTimeout(()=>{if(!settled){settled=true;reject(Error('Phaser startup timed out'))}},12000);game=new Phaser.Game({type:Phaser.AUTO,parent:'view',width:640,height:320,backgroundColor:'#e5eee5',scale:{mode:Phaser.Scale.NONE},scene:{preload(){for(const [asset,url] of Object.entries(urls)){const key='visual-'+keyMap.size;keyMap.set(asset,key);this.load.image(key,url)}},create(){try{const sc=this,sprites=new Map();draw=()=>{const visible=visual.visible();for(const [key,s] of sprites)if(!visible.some(v=>v.locationId===key)){s.destroy();sprites.delete(key)}for(const item of visible){let sprite=sprites.get(item.locationId);if(!sprite){sprite=sc.add.image(item.x,item.y,keyMap.get(item.asset));sprites.set(item.locationId,sprite)}sprite.setTexture(keyMap.get(item.asset)).setPosition(item.x,item.y).setDisplaySize(item.width,item.height).setAngle(item.rotation).setDepth(item.layer)}status('PASS: Phaser rendered '+visible.length+' WebP location(s). Tap buttons to change states.')};draw();if(!settled){settled=true;clearTimeout(timeout);resolve()}}catch(e){if(!settled){settled=true;clearTimeout(timeout);reject(e)}}}}})});cleanup=async()=>{game.destroy(true);Object.values(urls).forEach(URL.revokeObjectURL)} }
+controls(true)}catch(e){status('FAIL: '+e.message);controls(false)}};
+</script></html>
