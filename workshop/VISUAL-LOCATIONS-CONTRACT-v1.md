@@ -1,6 +1,6 @@
 # Reusable Visual Locations — Export Contract v1 (Increment 5A)
 
-Status: **proposed implementation contract**. This is a new optional companion export, not a replacement for the existing `game-graphics-placement` v1 or editable scene v3 files. Engine integration is not yet verified.
+Status: **implemented v1 companion contract**. This is an optional export, not a replacement for existing `game-graphics-placement` v1 or editable scene files. The adapter and simplified WebP engine demonstrations were verified on iPad in PixiJS v8 and Phaser 3; full exported artwork bundles are not yet end-to-end verified.
 
 ## Purpose
 
@@ -65,7 +65,7 @@ Filename: `game-visual-locations.json`. Root `format: "game-graphics-visual-loca
 1. Create one location, two choices, two appearances per choice; align each visually and switch editor previews.
 2. Duplicate and move the complete location, keeping relative alignment and assigning a unique ID.
 3. Save/reopen/edit, validate and export the companion JSON without breaking existing scene placement exports.
-4. In both PixiJS v8 and Phaser 3, load the exported data, select appearances by IDs, and verify independent locations and touch zones on iPad.
+4. In both PixiJS v8 and Phaser 3, select appearances by IDs and verify independent locations on iPad. Simplified WebP rendering passed; loading actual exported artwork paths and touch-zone behavior in both engines remains a separate integration test.
 5. Test a crop scenario and a construction scenario with the same code; add automated contract checks and documentation.
 
-**Implementation note:** This contract is committed first so the editor and verification tools can be developed against a fixed, reviewable interface. No UI or runtime behavior is claimed by this document alone.
+**Implementation note:** Editor and adapter are implemented. The editor currently exports no `touchZone` property for visual locations; this optional field is supported by the adapter when supplied by game data. The demo's hit-test and renderer checks do not replace a complete asset-bundle integration test.
