@@ -1,0 +1,18 @@
+name: Visual Locations Checks
+on:
+  push:
+    branches:
+      - development/reusable-visual-locations-5a
+  workflow_dispatch:
+jobs:
+  node-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Visual locations adapter tests
+        run: node --test tests/visual-locations.test.mjs
+      - name: Workshop source-contract tests
+        run: node --test tests/workshop-contract.test.mjs

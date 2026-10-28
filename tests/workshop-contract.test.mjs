@@ -14,7 +14,7 @@ const contract = read('workshop/EXPORT-CONTRACT-v1.md');
 
 test('scene export retains versioned placement JSON and separate editable project', () => {
   assert.match(scene, /format:'game-graphics-placement',version:1/);
-  assert.match(scene, /format:'game-graphics-workshop-scene',version:3/);
+  assert.match(scene, /format:'game-graphics-workshop-scene',version:4/);
   assert.match(scene, /a\.download='game-placement\.json'/);
   assert.match(scene, /hotspots:hotspots\.map\(h=>\(\{\.\.\.h,type:'rectangle'\}\)\)/);
   assert.match(scene, /touchZone:\{type:'rectangle',\.\.\.zone\(o\)\}/);
@@ -51,4 +51,16 @@ test('home and documentation link the full toolchain', () => {
   assert.match(workflow, /game-placement\.json/);
   assert.match(contract, /game-graphics-placement/);
   assert.match(contract, /game-graphics-animation/);
+});
+
+
+test('visual locations have independent editor controls and versioned game export', () => {
+  for (const id of ['vlAddLocation','vlAddChoice','vlAddAppearance','vlLocationId','vlChoiceId','vlAppearanceId','vlImage','vlAsset','vlExport']) assert.ok(scene.includes('id="'+id+'"'), 'Missing '+id);
+  assert.match(scene, /format:'game-graphics-visual-locations',version:1/);
+  assert.match(scene, /a\.download=name/);
+  assert.match(scene, /function vlValid\(\)/);
+  assert.match(scene, /function vlHit\(p\)/);
+  assert.match(scene, /version:4,visualLocations:/);
+  assert.match(scene, /\[1,2,3,4\]\.includes\(data\.version\)/);
+  assert.match(scene, /const incomingHotspots=data\.version>=3/);
 });
