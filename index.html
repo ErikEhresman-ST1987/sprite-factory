@@ -14,13 +14,14 @@
 <h2 id="source-title"><span class="step">1</span> Choose artwork</h2>
 <label class="file-label" for="file">Image file <span class="hint">PNG, JPG, or WebP</span></label>
 <input id="file" type="file" accept="image/png,image/jpeg,image/webp">
+<div id="samplePanel" hidden style="margin-top:14px"><p class="muted small">Tap a clear background area in the image to select its actual color.</p><canvas id="sampleCanvas" width="400" height="300" style="display:block;max-width:100%;height:auto;touch-action:manipulation;border:1px solid #506074;border-radius:8px;cursor:crosshair"></canvas><p id="sampleStatus" class="muted small" aria-live="polite"></p></div>
 </section>
 <section class="panel" aria-labelledby="settings-title">
 <h2 id="settings-title"><span class="step">2</span> <span id="settingsHeading">Prepare sprite</span></h2><div id="spriteSettings">
-<div class="setting"><label for="tolerance">White background removal <span class="hint">Tolerance: <output id="tol">35</output></span></label><input id="tolerance" type="range" min="0" max="90" value="35"></div>
+<div class="setting"><label for="keyMode">Background removal</label><select id="keyMode"><option value="white">White (existing)</option><option value="color">Selected color</option></select></div><div class="setting" id="keyColorSetting" hidden><label for="keyColor">Background HEX color</label><input id="keyColor" type="text" value="#FF00FF" maxlength="7" inputmode="text" spellcheck="false" placeholder="#FF00FF"><span class="hint">Use the intended background color from your master image.</span></div><div class="setting"><label for="tolerance">Background removal <span class="hint">Tolerance: <output id="tol">35</output></span></label><input id="tolerance" type="range" min="0" max="90" value="35"></div>
 <div class="check-group">
-<label><input type="checkbox" id="enclosedWhite"> Remove white areas inside artwork <span class="hint">May also remove white details</span></label>
-<label><input type="checkbox" id="edgeCleanup" checked> Soften pale edges</label>
+<label><input type="checkbox" id="enclosedWhite"> Remove matching areas inside artwork <span class="hint">In white mode this may remove white details</span></label>
+<label><input type="checkbox" id="edgeCleanup" checked> Soften edges</label>
 <label><input type="checkbox" id="autoCrop"> Center and size the subject automatically</label>
 </div>
 <div class="setting"><label for="coverage">Subject size <span class="hint"><output id="coverageValue">90%</output> when auto sizing is on</span></label><input id="coverage" type="range" min="50" max="100" value="90" step="5"></div>
@@ -37,6 +38,6 @@
 </section>
 <footer class="muted small">Sprite Factory · Increment 11F shared horizontal anchoring test</footer>
 </main>
-<script src="app.js?v=20261022a"></script>
+<script src="app.js?v=20261029-color-sampler"></script>
 </body>
 </html>
