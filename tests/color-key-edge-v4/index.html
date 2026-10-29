@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#17202b">
+<title>Sprite Factory</title>
+<link rel="stylesheet" href="../../style.css?v=20261012c">
+</head>
+<body>
+<main>
+<header><p><a href="../../workshop/index.html" style="color:#a9e6d1">← Workshop Home</a></p><h1>Sprite Factory</h1><p class="muted">Prepare transparent sprites and full-screen game scenery.</p></header>
+<section class="panel"><h2>Graphic type</h2><div class="mode-switch"><label><input type="radio" name="mode" value="sprite" checked> Sprite</label><label><input type="radio" name="mode" value="background"> Background</label><label><input type="radio" name="mode" value="sheet"> Sprite Sheet</label></div><p id="modeHelp" class="muted small">Transparent artwork for characters, objects, and items.</p></section><section class="panel" aria-labelledby="source-title">
+<h2 id="source-title"><span class="step">1</span> Choose artwork</h2>
+<label class="file-label" for="file">Image file <span class="hint">PNG, JPG, or WebP</span></label>
+<input id="file" type="file" accept="image/png,image/jpeg,image/webp">
+</section>
+<section class="panel" aria-labelledby="settings-title">
+<h2 id="settings-title"><span class="step">2</span> <span id="settingsHeading">Prepare sprite</span></h2><div id="spriteSettings">
+<div class="setting"><label for="keyMode">Background removal</label><select id="keyMode"><option value="white">White (existing)</option><option value="color">Selected color</option></select></div><div class="setting" id="keyColorSetting" hidden><label for="keyColor">Background HEX color</label><input id="keyColor" type="text" value="#FF00FF" maxlength="7" inputmode="text" spellcheck="false" placeholder="#FF00FF"><span class="hint">Use the intended background color from your master image.</span></div><div class="setting"><label for="tolerance">Background removal <span class="hint">Tolerance: <output id="tol">35</output></span></label><input id="tolerance" type="range" min="0" max="90" value="35"></div>
+<div class="check-group">
+<label><input type="checkbox" id="enclosedWhite"> Remove matching areas inside artwork <span class="hint">In white mode this may remove white details</span></label>
+<label><input type="checkbox" id="edgeCleanup" checked> Soften edges</label>
+<label><input type="checkbox" id="autoCrop"> Center and size the subject automatically</label>
+</div>
+<div class="setting"><label for="coverage">Subject size <span class="hint"><output id="coverageValue">90%</output> when auto sizing is on</span></label><input id="coverage" type="range" min="50" max="100" value="90" step="5"></div>
+<div class="setting"><label for="preset">Output size</label><select id="preset"><option value="custom">Custom dimensions</option><option value="64">64 × 64</option><option value="128">128 × 128</option><option value="256">256 × 256</option><option value="512" selected>512 × 512</option><option value="1024">1024 × 1024</option></select></div>
+<div class="dimensions"><label for="width">Width <input id="width" type="number" min="1" max="4096" value="512"></label><label for="height">Height <input id="height" type="number" min="1" max="4096" value="512"></label></div>
+<label class="fit-label"><input type="checkbox" id="fit" checked> Keep original proportions</label></div><div id="backgroundSettings" hidden><p class="muted">Fill the entire image without stretching. Excess scenery is cropped evenly from the edges. White skies and clouds remain intact.</p><div class="setting"><label for="bgPreset">Screen size</label><select id="bgPreset"><option value="1280x720" selected>1280 × 720 (16:9)</option><option value="1920x1080">1920 × 1080 (16:9)</option><option value="1024x768">1024 × 768 (4:3)</option><option value="custom">Custom dimensions</option></select></div><div class="dimensions"><label for="bgWidth">Width <input id="bgWidth" type="number" min="1" max="4096" value="1280"></label><label for="bgHeight">Height <input id="bgHeight" type="number" min="1" max="4096" value="720"></label></div></div><div id="sheetSettings" hidden><p class="muted">Prepare one row of equally spaced animation frames. Each equal-width source region becomes one transparent animation frame. The workshop keeps feet aligned across frames.</p><div class="setting"><label for="sheetCount">Frames in row</label><input id="sheetCount" type="number" min="2" max="16" step="1" value="4"><span class="hint">Start with 4 for the chicken Idle sheet. The image is divided evenly into this many frames.</span></div><div class="setting"><label for="sheetCellSize">Output cell size</label><select id="sheetCellSize"><option value="128">128 × 128</option><option value="256" selected>256 × 256</option><option value="512">512 × 512</option></select></div><div class="setting"><label for="sheetAlignment">Frame alignment</label><select id="sheetAlignment"><option value="stationary" selected>Stationary (idle, pecking, clucking)</option><option value="moving">Moving (preserve original offsets)</option></select><span class="hint">Stationary aligns the main body across frames; moving preserves the original horizontal placement.</span></div><div class="setting"><label for="sheetExtraction">Extraction method</label><select id="sheetExtraction"><option value="equal" selected>Equal-width (original)</option><option value="smart">Smart boundaries (experimental)</option><option value="components">Individual characters (experimental)</option></select><span class="hint">Smart mode searches for empty gaps near expected cuts and refuses to export when a safe gap cannot be found.</span></div><div class="setting"><button id="diagnoseSheet" type="button" disabled>Analyze source boundaries</button><span class="hint">Diagnostic only. Shows equal-width cutting lines and where visible artwork crosses them. Export processing is unchanged.</span></div><div class="setting"><button id="detectCharacters" type="button" disabled>Detect individual characters</button><span class="hint">Experimental diagnostic only. Outlines separate connected foreground regions; does not change export.</span></div><div id="componentDiagnostics" hidden><p id="componentText" class="muted" role="status"></p><div class="diagnostic-view"><canvas id="componentCanvas" aria-label="Detected character regions outlined on the original artwork"></canvas></div></div><div id="sheetDiagnostics" hidden><p id="diagnosticText" class="muted" role="status"></p><div class="diagnostic-view"><canvas id="diagnosticCanvas" aria-label="Original source artwork with frame boundary guides"></canvas></div></div><p id="sheetSummary" class="muted" aria-live="polite">Planned output: 1024 × 256 pixels (4 frames).</p></div>
+</section>
+<section class="panel" aria-labelledby="result-title">
+<h2 id="result-title"><span class="step">3</span> Export graphic</h2>
+<div class="actions"><button id="process" disabled>Create WebP</button><a id="download" hidden>Download WebP</a></div>
+<div id="animationPanel" class="animation-panel" hidden><h3>Animation preview</h3><div class="animation-stage"><canvas id="animationCanvas" width="256" height="256" aria-label="Animated sprite frame preview"></canvas></div><div class="animation-controls"><button id="animationToggle" type="button">Play</button><label for="animationFps">Speed <output id="animationFpsValue">4</output> frames/sec</label><input id="animationFps" type="range" min="1" max="12" step="1" value="4"></div><p id="animationNote" class="muted small">Preview uses the processed sprite sheet. Export remains a single WebP file.</p></div><p id="status" role="status">Choose an image to begin.</p>
+<div class="preview" aria-label="Sprite preview on a transparency checkerboard"><canvas id="preview"></canvas></div>
+<p class="muted small">Checkerboard areas are transparent in Sprite and Sprite Sheet modes. Background mode fills the canvas. WebP output is verified before download. An internet connection is required on browsers that need the WebP encoder.</p>
+</section>
+<footer class="muted small">Sprite Factory · Increment 11F shared horizontal anchoring test</footer>
+</main>
+<script src="app.js?v=20261029-edge-v4"></script>
+</body>
+</html>
