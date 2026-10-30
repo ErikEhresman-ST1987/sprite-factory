@@ -5,7 +5,7 @@
 </style></head><body><main><a href="../index.html">← Workshop Home</a><h1>Scene Editor</h1><p>Place multiple sprites over a background. Tap a sprite to select it, drag to move it, adjust its size and rotation, and change which sprites appear in front.</p>
 <div class="toolbar">
 <label class="file">Load background<input id="background" type="file" accept="image/*"></label>
-<label class="file">Load sprite<input id="sprite" type="file" accept="image/*"></label><label class="file">1. Choose animation WebP<input id="animationStrip" type="file"></label><label class="file">2. Choose animation JSON<input id="animationMeta" type="file" accept=".json,application/json"></label>
+<label class="file">Load sprite<input id="sprite" type="file" accept="image/*"></label><label class="file">1. Choose strip (or use Load sprite)<input id="animationStrip" type="file"></label><label class="file">2. Apply animation JSON to selected sprite<input id="animationMeta" type="file" accept=".json,application/json"></label>
 <button id="center">Center selected</button><button id="back">Send backward</button><button id="front">Bring forward</button><button id="remove">Remove selected</button><button id="save">Download project</button><button id="export">Export game placement JSON</button>
 <label class="file">Open project<input id="project" type="file" accept=".json,application/json"></label>
 <button id="reset">Clear scene</button><button id="addHotspot">Add background hotspot</button>
@@ -67,30 +67,22 @@ if(o.id===selected){ctx.strokeStyle='#a7e9d3';ctx.lineWidth=2;ctx.strokeRect(-o.
 function refreshHotspots(){const picker=$('hotspots');picker.replaceChildren();for(const h of hotspots){const o=document.createElement('option');o.value=h.id;o.textContent=h.name+' ('+h.id+')';picker.append(o)}const h=hotspots.find(h=>h.id===selectedHotspot);picker.value=h?h.id:'';picker.disabled=!h;$('hotspotName').disabled=!h;$('hotspotKey').disabled=!h;$('removeHotspot').disabled=!h;if(h){$('hotspotName').value=h.name;$('hotspotKey').value=h.action}else{$('hotspotName').value='';$('hotspotKey').value=''}}
 function refresh(){refreshHotspots();const picker=$('objects');picker.replaceChildren();for(const o of objects){const opt=document.createElement('option');opt.value=String(o.id);opt.textContent=o.name;picker.append(opt)}const o=current();picker.value=o?String(o.id):'';picker.disabled=!o;$('zoneReset').disabled=!o;$('rotation').disabled=!o;$('rotateLeft').disabled=!o;$('rotateRight').disabled=!o;$('back').disabled=!o;$('front').disabled=!o;$('width').disabled=!o;$('smaller').disabled=!o;$('larger').disabled=!o;$('remove').disabled=!o;$('center').disabled=!o;if(o){$('width').value=o.w;$('rotation').value=o.rotation||0}$('size').textContent=o?o.w+' px':'No sprite';$('angle').textContent=o?(o.rotation||0)+'°':'—';draw()}
 async function loadImage(input,kind){const file=input.files&&input.files[0];if(!file)return;try{const data=await read(file),im=await image(data);if(kind==='bg'){bg=im;bgData=data;if(!objects.length)setDimensions(Math.min(4096,Math.max(100,im.width)),Math.min(4096,Math.max(100,im.height)),false)}else{const o={id:nextId++,name:file.name,x:Math.round(W/2),y:Math.round(H/2),w:Math.min(180,W),rotation:0,data,im};o.touchZone=defaultZone(o);objects.push(o);selected=o.id}refresh();status(file.name+' loaded')}catch(e){status(e.message)}finally{input.value=''}}
-let pendingAnimationStrip=null;
-$('animationStrip').addEventListener('change',e=>{
-const file=e.target.files&&e.target.files[0];e.target.value='';
-if(!file)return;
-if(!/\\.webp$/i.test(file.name)){status('Choose the WebP animation strip first');return}
-pendingAnimationStrip=file;status('WebP selected: '+file.name+'. Now tap 2. Choose animation JSON.');
+$('animationStrip').addEventListener('change',async e=>{
+const file=e.target.files?.[0];e.target.value='';
+if(!file){status('No strip selected');return}
+try{const data=await read(file),im=await image(data);if(objects.length>=100)throw Error('Maximum 100 scene objects');const o={id:nextId++,name:file.name,x:Math.round(W/2),y:Math.round(H/2),w:Math.min(180,W),rotation:0,data,im};o.touchZone=defaultZone(o);objects.push(o);selected=o.id;refresh();status('Strip loaded: '+file.name+'. Now choose its JSON.')}catch(err){status('Strip not loaded: '+err.message)}
 });
 $('animationMeta').addEventListener('change',async e=>{
-const metaFile=e.target.files&&e.target.files[0];e.target.value='';
-if(!metaFile)return;
+const file=e.target.files?.[0];e.target.value='';if(!file)return;
 try{
-const strip=pendingAnimationStrip;
-if(!strip)throw Error('Choose the WebP strip first using button 1');
-if(!/\\.json$/i.test(metaFile.name))throw Error('Choose the matching animation JSON');
-const meta=JSON.parse(await metaFile.text());
-if(meta.format!=='game-graphics-animation'||meta.version!==1||meta.layout!=='horizontal'||meta.asset!==strip.name||!Number.isSafeInteger(meta.frameWidth)||!Number.isSafeInteger(meta.frameHeight)||!Number.isSafeInteger(meta.frameCount)||meta.frameWidth<1||meta.frameHeight<1||meta.frameCount<1||!Number.isFinite(meta.fps)||meta.fps<=0||typeof meta.loop!=='boolean')throw Error('Invalid animation metadata or mismatched strip filename');
-const data=await read(strip),sheet=await image(data);
-if(sheet.width!==meta.frameWidth*meta.frameCount||sheet.height!==meta.frameHeight)throw Error('WebP strip dimensions do not match animation JSON');
-if(objects.length>=100)throw Error('Maximum 100 scene objects');
-const preview=document.createElement('canvas');preview.width=meta.frameWidth;preview.height=meta.frameHeight;
-preview.getContext('2d').drawImage(sheet,0,0,meta.frameWidth,meta.frameHeight,0,0,meta.frameWidth,meta.frameHeight);
-const still=preview.toDataURL('image/png'),im=await image(still);
-const o={id:nextId++,name:strip.name,x:Math.round(W/2),y:Math.round(H/2),w:Math.min(180,W),rotation:0,data:still,im,animation:{asset:strip.name,metadata:metaFile.name,frameWidth:meta.frameWidth,frameHeight:meta.frameHeight,frameCount:meta.frameCount,fps:meta.fps,loop:meta.loop,layout:'horizontal'}};
-o.touchZone=defaultZone(o);objects.push(o);selected=o.id;pendingAnimationStrip=null;refresh();status('Animation placed as a still first frame. Drag and resize it like a sprite; game export includes its animation reference.');
+const o=current();if(!o)throw Error('First load the WebP strip with Load sprite or Choose animation WebP');
+const meta=JSON.parse(await file.text());
+if(meta.format!=='game-graphics-animation'||meta.version!==1||meta.layout!=='horizontal'||!Number.isSafeInteger(meta.frameWidth)||!Number.isSafeInteger(meta.frameHeight)||!Number.isSafeInteger(meta.frameCount)||meta.frameWidth<1||meta.frameHeight<1||meta.frameCount<1||!Number.isFinite(meta.fps)||meta.fps<=0||typeof meta.loop!=='boolean')throw Error('Invalid animation JSON');
+if(o.im.width!==meta.frameWidth*meta.frameCount||o.im.height!==meta.frameHeight)throw Error('Selected image dimensions do not match the animation JSON');
+const preview=document.createElement('canvas');preview.width=meta.frameWidth;preview.height=meta.frameHeight;preview.getContext('2d').drawImage(o.im,0,0,meta.frameWidth,meta.frameHeight,0,0,meta.frameWidth,meta.frameHeight);
+const still=preview.toDataURL('image/png');o.im=await image(still);o.data=still;o.name=meta.asset||o.name;
+o.animation={asset:meta.asset||o.name,metadata:file.name,frameWidth:meta.frameWidth,frameHeight:meta.frameHeight,frameCount:meta.frameCount,fps:meta.fps,loop:meta.loop,layout:'horizontal'};
+o.touchZone=defaultZone(o);refresh();status('Animation ready: first frame displayed. Position it on the scene.');
 }catch(err){status('Animation not loaded: '+err.message)}
 });
 $('background').addEventListener('change',e=>loadImage(e.target,'bg'));$('sprite').addEventListener('change',e=>loadImage(e.target,'sp'));
