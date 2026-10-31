@@ -422,12 +422,13 @@ function extractConnectedSubjects(ctx,w,h,n){
 }
 
 async function updateCropNotice(){
+ const requestedSource=source;
  const note=$('cropNotice');if(!note)return;
  if(!source){note.textContent='Choose an image to see cropping information.';return;}
  const w=Number($('bgWidth').value),h=Number($('bgHeight').value);
  if(!(w>0&&h>0)){note.textContent='Enter valid output dimensions.';return;}
  try{const bmp=await createImageBitmap(source);try{
-  if(source!==currentSource)return;
+  if(source!==requestedSource)return;
   const sourceRatio=bmp.width/bmp.height,targetRatio=w/h;
   const retained=Math.min(sourceRatio/targetRatio,targetRatio/sourceRatio);
   const lost=Math.round((1-retained)*100);
