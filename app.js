@@ -133,14 +133,10 @@ async function createSceneGraphic(){
   $('status').textContent='Encoding scene WebP…';
   let blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/webp',.95)),encoder='browser';
   if(!blob||blob.type!=='image/webp'){
-   $('status').textContent='Browser WebP encoder unavailable. Trying alternate encoder…';
-   try{const codec=await import('https://esm.sh/@jsquash/webp@1.5.0');blob=new Blob([await codec.encode(ctx.getImageData(0,0,ow,oh))],{type:'image/webp'});encoder='WebAssembly';}
-   catch(error){
-    $('status').textContent='WebP encoder unavailable; creating transparent PNG instead…';
-    blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
-    if(!blob||blob.type!=='image/png')throw Error('Neither WebP nor PNG encoding is available.');
-    encoder='PNG fallback';
-   }
+   $('status').textContent='WebP not supported here; exporting PNG with transparency…';
+   blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+   if(!blob||blob.type!=='image/png')throw Error('PNG encoding failed in this browser.');
+   encoder='PNG fallback';
   }
   const bytes=new Uint8Array(await blob.slice(0,12).arrayBuffer()),tag=(a,b)=>String.fromCharCode(...bytes.slice(a,b)),isPNG=encoder==='PNG fallback';if(isPNG?(bytes[0]!==137||tag(1,4)!=='PNG'):(tag(0,4)!=='RIFF'||tag(8,12)!=='WEBP'))throw Error('Invalid image export.');
   const test=await createImageBitmap(blob);try{if(test.width!==ow||test.height!==oh)throw Error('Output dimensions mismatch.');if(removal){const verify=document.createElement('canvas');verify.width=ow;verify.height=oh;const vc=verify.getContext('2d',{willReadFrequently:true});vc.drawImage(test,0,0);const data=vc.getImageData(0,0,ow,oh).data;let clear=false,visible=false;for(let i=3;i<data.length;i+=4){if(data[i]===0)clear=true;if(data[i]>0)visible=true;if(clear&&visible)break;}verify.width=0;verify.height=0;if(!clear||!visible)throw Error('Overlay must have both transparent and visible pixels.');}}finally{test.close();}
