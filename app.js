@@ -113,7 +113,7 @@ function removeEnclosedWhite(data,width,height,tolerance){
 if('serviceWorker'in navigator){navigator.serviceWorker.getRegistrations().then(regs=>Promise.all(regs.filter(r=>r.scope.startsWith(location.origin+location.pathname.replace(/[^/]*$/,''))).map(r=>r.unregister()))).catch(()=>{})}
 
 $('standardQuality').addEventListener('input',()=>{$('standardQualityValue').textContent=$('standardQuality').value+'%';});
-async async function createSceneGraphic(){
+async function createSceneGraphic(){
  let bmp=null,raw=null;
  try{
   bmp=await createImageBitmap(source);
@@ -138,7 +138,7 @@ async async function createSceneGraphic(){
   if(downloadUrl)URL.revokeObjectURL(downloadUrl);downloadUrl=URL.createObjectURL(blob);$('download').href=downloadUrl;$('download').download=source.name.replace(/\.[^.]+$/,'')+(removal?'-overlay.webp':'-exterior.webp');$('download').hidden=false;$('status').textContent='Verified '+ow+' × '+oh+' '+(removal?'transparent overlay':'exterior image')+' ('+encoder+'). Inspect edges visually.';
  }finally{if(bmp)bmp.close();if(raw){raw.width=0;raw.height=0;}}
 }
-function createStandardImage(){
+async function createStandardImage(){
  const max=Number($('standardMax').value),quality=Number($('standardQuality').value)/100;
  const bmp=await createImageBitmap(source);
  try{
