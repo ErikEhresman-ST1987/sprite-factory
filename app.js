@@ -132,10 +132,19 @@ async function createSceneGraphic(){
   const scale=$('sceneFit').value==='cover'?Math.max(ow/raw.width,oh/raw.height):Math.min(ow/raw.width,oh/raw.height),dw=raw.width*scale,dh=raw.height*scale;ctx.drawImage(raw,(ow-dw)/2,(oh-dh)/2,dw,dh);
   $('status').textContent='Encoding scene WebP…';
   let blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/webp',.95)),encoder='browser';
-  if(!blob||blob.type!=='image/webp'){encoder='WebAssembly';const codec=await import('https://esm.sh/@jsquash/webp@1.5.0');blob=new Blob([await codec.encode(ctx.getImageData(0,0,ow,oh))],{type:'image/webp'});}
-  const bytes=new Uint8Array(await blob.slice(0,12).arrayBuffer()),tag=(a,b)=>String.fromCharCode(...bytes.slice(a,b));if(tag(0,4)!=='RIFF'||tag(8,12)!=='WEBP')throw Error('Invalid WebP export.');
+  if(!blob||blob.type!=='image/webp'){
+   $('status').textContent='Browser WebP encoder unavailable. Trying alternate encoder…';
+   try{const codec=await import('https://esm.sh/@jsquash/webp@1.5.0');blob=new Blob([await codec.encode(ctx.getImageData(0,0,ow,oh))],{type:'image/webp'});encoder='WebAssembly';}
+   catch(error){
+    $('status').textContent='WebP encoder unavailable; creating transparent PNG instead…';
+    blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+    if(!blob||blob.type!=='image/png')throw Error('Neither WebP nor PNG encoding is available.');
+    encoder='PNG fallback';
+   }
+  }
+  const bytes=new Uint8Array(await blob.slice(0,12).arrayBuffer()),tag=(a,b)=>String.fromCharCode(...bytes.slice(a,b)),isPNG=encoder==='PNG fallback';if(isPNG?(bytes[0]!==137||tag(1,4)!=='PNG'):(tag(0,4)!=='RIFF'||tag(8,12)!=='WEBP'))throw Error('Invalid image export.');
   const test=await createImageBitmap(blob);try{if(test.width!==ow||test.height!==oh)throw Error('Output dimensions mismatch.');if(removal){const verify=document.createElement('canvas');verify.width=ow;verify.height=oh;const vc=verify.getContext('2d',{willReadFrequently:true});vc.drawImage(test,0,0);const data=vc.getImageData(0,0,ow,oh).data;let clear=false,visible=false;for(let i=3;i<data.length;i+=4){if(data[i]===0)clear=true;if(data[i]>0)visible=true;if(clear&&visible)break;}verify.width=0;verify.height=0;if(!clear||!visible)throw Error('Overlay must have both transparent and visible pixels.');}}finally{test.close();}
-  if(downloadUrl)URL.revokeObjectURL(downloadUrl);downloadUrl=URL.createObjectURL(blob);$('download').href=downloadUrl;$('download').download=source.name.replace(/\.[^.]+$/,'')+(removal?'-overlay.webp':'-exterior.webp');$('download').hidden=false;$('status').textContent='Verified '+ow+' × '+oh+' '+(removal?'transparent overlay':'exterior image')+' ('+encoder+'). Inspect edges visually.';
+  if(downloadUrl)URL.revokeObjectURL(downloadUrl);downloadUrl=URL.createObjectURL(blob);$('download').href=downloadUrl;$('download').download=source.name.replace(/\.[^.]+$/,'')+(removal?'-overlay':'-exterior')+(isPNG?'.png':'.webp');$('download').hidden=false;$('download').textContent=isPNG?'Download PNG':'Download WebP';$('status').textContent='Verified '+ow+' × '+oh+' '+(removal?'transparent overlay':'exterior image')+' ('+encoder+'). '+(isPNG?'WebP encoding is unavailable in this browser; PNG preserves transparency.':'Inspect edges visually.');
  }finally{if(bmp)bmp.close();if(raw){raw.width=0;raw.height=0;}}
 }
 async function createStandardImage(){
