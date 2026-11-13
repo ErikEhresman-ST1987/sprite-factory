@@ -1,5 +1,8 @@
 # Sprite Factory
 
+> **AI development chats:** Start with **[AI-START-HERE.md](AI-START-HERE.md)**. It routes to current capability references for [Sprite Factory](AI-SPRITE-FACTORY.md), [Scene Editor](AI-SCENE-EDITOR.md), [Animation Studio](AI-ANIMATION-STUDIO.md), and [game integration](AI-ASSET-INTEGRATION.md). The application itself contains the human-facing instructions. Historical development notes below may predate the current production code, including the newer Standard Image and Scene Graphics modes.
+
+
 A browser-based graphics preparation workshop for game assets, developed primarily for **Little Field Farm** and tested in iPad Safari. Import PNG, JPG, or WebP artwork; inspect a preview; export verified WebP assets. This README documents the production state through **Increment 11F (accepted and merged, October 2026)**.
 
 ## Game Graphics Workshop — current development branch
