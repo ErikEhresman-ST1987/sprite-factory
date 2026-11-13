@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Animation Studio · Game Graphics Workshop</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#111821;color:#eef3f8;font:16px system-ui,-apple-system,sans-serif}main{max-width:900px;margin:auto;padding:16px}h1{font-size:26px;margin:12px 0 6px}p,small{color:#b7c4d1}a{color:#a6e1d0}.toolbar,.controls{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin:14px 0}button,.file,select{background:#294459;color:#fff;border:1px solid #607d90;border-radius:9px;padding:10px 13px;font:inherit;min-height:44px}button:disabled{opacity:.45}.file input{display:none}button:focus-visible,.file:focus-within,select:focus-visible{outline:3px solid #a6e1d0}.stage{background:#273544;border:1px solid #526579;border-radius:12px;overflow:hidden;touch-action:none}.stage canvas{display:block;width:100%;height:auto;aspect-ratio:4/3;touch-action:none}.controls label{display:flex;gap:8px;align-items:center}.controls input{max-width:145px}#status{min-height:28px;color:#b7c4d1}.notice{padding:12px;background:#203344;border-radius:9px}#frames{max-width:100%}
+*{box-sizing:border-box}body{margin:0;background:#111821;color:#eef3f8;font:16px system-ui,-apple-system,sans-serif}main{max-width:900px;margin:auto;padding:16px}h1{font-size:26px;margin:12px 0 6px}p,small{color:#b7c4d1}a{color:#a6e1d0}.toolbar,.controls{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin:14px 0}button,.file,select,input[type="text"]{background:#294459;color:#fff;border:1px solid #607d90;border-radius:9px;padding:10px 13px;font:inherit;min-height:44px}button:disabled{opacity:.45}.file input{display:none}button:focus-visible,.file:focus-within,select:focus-visible{outline:3px solid #a6e1d0}.stage{background:#273544;border:1px solid #526579;border-radius:12px;overflow:hidden;touch-action:none}.stage canvas{display:block;width:100%;height:auto;aspect-ratio:4/3;touch-action:none}.controls label{display:flex;gap:8px;align-items:center}.controls input{max-width:145px}#status{min-height:28px;color:#b7c4d1}.notice{padding:12px;background:#203344;border-radius:9px}#frames{max-width:100%}
 </style></head><body><main>
 <a href="../index.html">← Workshop Home</a><h1>Animation Studio</h1>
 <p>Import individual transparent frames, align them on a shared canvas, and preview the movement.</p>
@@ -16,10 +16,11 @@
 <label>Speed <input id="fps" type="range" min="1" max="12" value="6" step="1"></label><output id="speed">6 FPS</output>
 <label><input id="ghost" type="checkbox" checked> Previous-frame ghost</label>
 </div>
+<div class="controls"><label>Animation name <input id="animationName" type="text" maxlength="64" value="animation" placeholder="sheep_jump" autocomplete="off" spellcheck="false"></label><label>Playback <select id="playback"><option value="loop">Loop</option><option value="once">Play once</option><option value="hold">Hold last frame</option></select></label></div>
 <div class="toolbar"><label>Export frame size <select id="exportSize"><option value="128">128 × 128</option><option value="256" selected>256 × 256</option><option value="512">512 × 512</option></select></label><button id="exportWebp">Prepare WebP and JSON</button><button id="downloadWebp" disabled>Download WebP image</button><button id="downloadJson" disabled>Download JSON metadata</button></div>
 <div class="toolbar"><button id="save">Download editable project</button><label class="file">Open project<input id="project" type="file" accept=".json,application/json"></label></div>
 <div id="status" role="status">Add two or more frames to begin. Drag the selected frame to align it.</div>
-<p class="notice"><small>Increment 3B: Export a transparent horizontal WebP sprite strip. Each frame uses the same canvas-based alignment and fits proportionally into its square cell. Maximum strip width: 4096 pixels. After preparing, download the WebP and JSON separately for iPad Safari reliability. The export is a sprite sheet, not a self-playing animated WebP. Download your editable project to preserve your work; this version does not autosave. Frames are shown at their original pixel sizes up to a maximum fit of 600 × 450, without changing the source artwork.</small></p>
+<p class="notice"><small>Increment 3B: Export a transparent horizontal WebP sprite strip. Each frame uses the same canvas-based alignment and fits proportionally into its square cell. Maximum strip width: 4096 pixels. After preparing, download the WebP and JSON separately for iPad Safari reliability. Name each animation and choose Loop, Play once, or Hold last frame for game playback metadata. The game controls touch triggers and transitions. The export is a sprite sheet, not a self-playing animated WebP. Download your editable project to preserve your work; this version does not autosave. Frames are shown at their original pixel sizes up to a maximum fit of 600 × 450, without changing the source artwork.</small></p>
 </main>
 <script>
 (()=>{
@@ -80,8 +81,10 @@ if(!valid)throw Error('Encoded WebP dimensions did not match expected strip');
 const bytes=new Uint8Array(await blob.slice(0,12).arrayBuffer());
 const tag=(start)=>String.fromCharCode(...bytes.slice(start,start+4));
 if(tag(0)!=='RIFF'||tag(8)!=='WEBP')throw Error('Encoded file failed WebP signature verification');
-const basename='animation-'+count+'frames-'+size+'px';
-const metadata={format:'game-graphics-animation',version:1,asset:basename+'.webp',frameWidth:size,frameHeight:size,frameCount:count,fps:Number($('fps').value),layout:'horizontal',loop:true};
+const basename=$('animationName').value.trim().toLowerCase().replace(/[^a-z0-9_-]+/g,'_').replace(/^[_-]+|[_-]+$/g,'');
+if(!basename)throw Error('Enter an animation name using letters or numbers');
+const playback=$('playback').value;
+const metadata={format:'game-graphics-animation',version:2,id:basename,asset:basename+'.webp',frameWidth:size,frameHeight:size,frameCount:count,fps:Number($('fps').value),layout:'horizontal',playback,loop:playback==='loop'};
 prepared={webp:blob,webpName:basename+'.webp',json:new Blob([JSON.stringify(metadata,null,2)],{type:'application/json'}),jsonName:basename+'.json'};
 $('downloadWebp').disabled=false;$('downloadJson').disabled=false;
 status('Verified WebP sprite strip ('+encoder+'): '+count+' frames × '+size+' px; '+width+' × '+size+' total. Tap Download WebP image, then Download JSON metadata.');
@@ -91,10 +94,12 @@ finally{btn.disabled=!frames.length}
 $('downloadWebp').onclick=()=>{if(prepared){download(prepared.webp,prepared.webpName);status('WebP download requested: '+prepared.webpName+'. Confirm it appears in Files → Downloads.')}};
 $('downloadJson').onclick=()=>{if(prepared){download(prepared.json,prepared.jsonName);status('JSON download requested: '+prepared.jsonName+'. Confirm it appears in Files → Downloads.')}};
 $('exportSize').addEventListener('change',invalidateExport);
-$('save').onclick=()=>{if(!frames.length){status('Add frames before saving');return}const project={format:'game-graphics-workshop-animation',version:1,canvas:{width:W,height:H},fps:Number($('fps').value),frames:frames.map(({name,data,x,y})=>({name,data,x,y}))};const blob=new Blob([JSON.stringify(project)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='workshop-animation.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);status('Editable project download prepared')};
+$('animationName').addEventListener('input',invalidateExport);
+$('playback').addEventListener('change',invalidateExport);
+$('save').onclick=()=>{if(!frames.length){status('Add frames before saving');return}const project={format:'game-graphics-workshop-animation',version:1,canvas:{width:W,height:H},fps:Number($('fps').value),animationName:$('animationName').value,playback:$('playback').value,frames:frames.map(({name,data,x,y})=>({name,data,x,y}))};const blob=new Blob([JSON.stringify(project)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='workshop-animation.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);status('Editable project download prepared')};
 $('project').addEventListener('change',async e=>{const file=e.target.files&&e.target.files[0];if(!file)return;pause();try{const p=JSON.parse(await file.text());if(p.format!=='game-graphics-workshop-animation'||p.version!==1||p.canvas?.width!==W||p.canvas?.height!==H||!Number.isInteger(p.fps)||p.fps<1||p.fps>12||!Array.isArray(p.frames)||p.frames.length>100)throw Error('Unsupported project');
 const restored=[];for(const f of p.frames){if(!f||typeof f.name!=='string'||typeof f.data!=='string'||!f.data.startsWith('data:image/')||![f.x,f.y].every(Number.isFinite)||f.x<0||f.x>W||f.y<0||f.y>H)throw Error('Invalid frame');restored.push({...f,im:await decode(f.data)})}
-invalidateExport();frames=restored;selected=0;$('fps').value=p.fps;$('speed').textContent=p.fps+' FPS';refresh();status('Restored '+frames.length+' frames')}catch(err){status('Open failed: '+err.message)}finally{e.target.value=''}});
+invalidateExport();frames=restored;selected=0;$('fps').value=p.fps;$('speed').textContent=p.fps+' FPS';$('animationName').value=typeof p.animationName==='string'?p.animationName:'animation';$('playback').value=['loop','once','hold'].includes(p.playback)?p.playback:'loop';refresh();status('Restored '+frames.length+' frames')}catch(err){status('Open failed: '+err.message)}finally{e.target.value=''}});
 refresh();
 })();
 </script></body></html>
