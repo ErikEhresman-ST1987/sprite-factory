@@ -19,4 +19,7 @@ User-reported: first-attempt loading, enclosed window removal, surrounding artwo
 ## B05 — Sprite-sheet processing — PASS (2026-11-26)
 User-reported: first-attempt loading, frame count, extraction, background removal, alignment, preview, WebP verification and Files download all passed. Observation: It all worked. Alternate extraction layouts, invalid inputs and width limits not independently verified.
 
-B06–B14 pending.
+## B06 — Repeated imports/mode switching — FAIL (2026-11-26)
+User reported: Couldn't load anything. I didn't refresh. F07 elevated to high priority. Exact failed step, picker behavior and app state not yet established. Do not infer root cause. Remaining B06 operations blocked/unverified. Preserve current page for diagnosis if possible.
+
+B07–B14 pending.
