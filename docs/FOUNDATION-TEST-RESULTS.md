@@ -16,4 +16,7 @@ F07 — Intermittent image-loading failure: investigate mode transitions, file s
 ## B04 — Scene graphics — PASS (2026-11-26)
 User-reported: first-attempt loading, enclosed window removal, surrounding artwork, transparency, dimensions, WebP verification and Files download all passed. Observation: Everything worked. Opaque exterior and alternate sizing configurations not separately verified. F07 remains open.
 
-B05–B14 pending.
+## B05 — Sprite-sheet processing — PASS (2026-11-26)
+User-reported: first-attempt loading, frame count, extraction, background removal, alignment, preview, WebP verification and Files download all passed. Observation: It all worked. Alternate extraction layouts, invalid inputs and width limits not independently verified.
+
+B06–B14 pending.
