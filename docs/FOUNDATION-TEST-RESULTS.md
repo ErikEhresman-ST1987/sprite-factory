@@ -25,4 +25,7 @@ User reported: Couldn't load anything. I didn't refresh. F07 elevated to high pr
 ### F07 diagnostic follow-up
 User confirms native picker never opens in any of the five modes; settings, instructions, other inputs and buttons continue to respond. Switching modes does not restore picker. Source inspection confirms a single native input id=file shared by all modes, change handler resets value to empty string; no obvious code disabling input. Earlier refresh restored functionality. General UI freeze not supported by observations; Safari picker lifecycle, hit testing and resource lifecycle remain candidates, not confirmed causes. Follow-up: user confirmed refresh instantly fixed the issue. Recovery confirmed, root cause unknown. Prioritize Increment 1 investigation; B06 remains failed.
 
-B07–B14 pending.
+## B07 — Scene Editor — PASS (2026-11-26)
+User-reported: background and sprite loading, position/size/rotation/layering, sprite touch zones, background hotspot creation/editing, editable save/reopen, artwork/position/hotspot preservation and game placement export all passed. Observation: Everything worked. Stable IDs and malformed imports not independently inspected.
+
+B08–B14 pending.
