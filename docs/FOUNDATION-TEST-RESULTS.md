@@ -22,4 +22,7 @@ User-reported: first-attempt loading, frame count, extraction, background remova
 ## B06 — Repeated imports/mode switching — FAIL (2026-11-26)
 User reported: Couldn't load anything. I didn't refresh. F07 elevated to high priority. Exact failed step, picker behavior and app state not yet established. Do not infer root cause. Remaining B06 operations blocked/unverified. Preserve current page for diagnosis if possible.
 
+### F07 diagnostic follow-up
+User confirms native picker never opens in any of the five modes; settings, instructions, other inputs and buttons continue to respond. Switching modes does not restore picker. Source inspection confirms a single native input id=file shared by all modes, change handler resets value to empty string; no obvious code disabling input. Earlier refresh restored functionality. General UI freeze not supported by observations; Safari picker lifecycle, hit testing and resource lifecycle remain candidates, not confirmed causes. Next diagnostic: refresh and retry once; record browser context and picker response.
+
 B07–B14 pending.
