@@ -8,4 +8,9 @@ User-reported: image loading, background removal, subject details, centering/siz
 ## B02 — Background processing — PASS (2026-11-26)
 User-reported: loading, dimensions/cropping, proportions, scrolling preview, image quality, WebP verification and Files download all passed. No observations. Alternate dimensions and source specifics not independently recorded.
 
-B03–B14 pending.
+## B03 — Standard image processing — CONDITIONAL PASS (2026-11-26)
+All six checks eventually passed: load, resize, proportions, quality, WebP verification and download. User observation: The picture wouldn’t load on the first try, it worked after I reloaded the page.
+
+F07 — Intermittent image-loading failure: investigate mode transitions, file selection, decode lifecycle and error handling; cause unknown. Retest in B06 before assigning root cause. Reload is workaround only. Source/settings and error message not recorded.
+
+B04–B14 pending.
