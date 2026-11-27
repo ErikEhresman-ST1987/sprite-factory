@@ -34,4 +34,7 @@ User-reported: scene dimensions, background/sprite resizing, hotspot visibility,
 ## B09 — Reusable visual locations — PARTIAL (2026-11-27)
 Additional submission labeled B08 repeated all seven passes and stated: I created the duplicates of the switched zone, and cleared and reloaded project It worked. Record duplication, switching and project recovery as reported observations; remaining B09 checks and visual-location export require confirmation. Do not count B09 as full pass yet.
 
+### B09 final confirmation — PASS
+User confirms foundation and alternative artwork display, duplicated location repositioning, touch zone configuration and visual location JSON export all passed. Together with earlier reported switching, duplication and project recovery, B09 functional protocol is passed. Export contents not independently inspected.
+
 B10–B14 pending.
