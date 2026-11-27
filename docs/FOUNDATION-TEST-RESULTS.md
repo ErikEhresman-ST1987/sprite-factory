@@ -56,3 +56,6 @@ Screenshot shows Phaser 3 selected and 'PASS: Phaser touch zone tapped. Sample a
 
 ### B11 baseline closure
 User deleted temporary exported assets after workflow confusion. Defer imported scene and background hotspot checks to repair phase; no repeat scene construction required now. B11 remains failed for confirmed animation compatibility defect; sample rendering and touch pass in both engines. Proposed reusable regression fixtures for future testing, not yet created. Sample animation motion not explicitly confirmed.
+
+## B12 — Main workspace offline — PASS (limited scope)
+User reports offline image loading, processing, WebP export and page reload all passed. Workshop offline operation, cold launch and fallback encoder availability remain untested. Continue with workshop offline checks.
