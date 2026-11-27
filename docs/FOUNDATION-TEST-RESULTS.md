@@ -50,3 +50,6 @@ Screenshots confirm both engines render built-in sample assets. Missing WebP wit
 
 ### B11 touch follow-up
 PixiJS selected screenshot displays PASS: PixiJS sprite touch zone tapped. Phaser selected screenshot displays same PixiJS message; selector alone does not establish active engine. PixiJS touch passed; Phaser touch pending explicit run and tap. Imported scenes remain untested.
+
+### B11 Phaser confirmation
+Screenshot shows Phaser 3 selected and 'PASS: Phaser touch zone tapped. Sample assets rendered.' Both engines now confirmed for built-in rendering and touch interaction. Imported scene placement and background hotspot interaction remain unverified; animation export incompatibility remains failed.
