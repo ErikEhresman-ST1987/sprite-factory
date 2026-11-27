@@ -53,3 +53,6 @@ Use existing production app on iPad Safari, retain original test files and outpu
 
 ## Exit gate
 Recovery and development branches verified at baseline initially. Static inventory covers known entry points, not an exhaustive repository tree (connector limitation). No runtime tests executed as part of this increment yet. Complete user-observed baseline tests (known failures may be documented), then approve Increment 1. Do not label baseline accepted before testing. Preserve original production branch.
+
+## Scope revision — 2026-11-27
+User explicitly states offline is no longer a priority. Existing offline behavior may be preserved where practical, but comprehensive offline testing, cold launch and offline dependency availability are no longer mandatory foundation acceptance gates. B12 main workspace passed; remaining offline checks waived, not verified. Offline dependency consolidation is optional rather than required; dependency reliability remains relevant. This revision supersedes earlier conflicting offline requirements for Sprite Factory only.
