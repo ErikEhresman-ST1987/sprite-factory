@@ -59,3 +59,6 @@ User deleted temporary exported assets after workflow confusion. Defer imported 
 
 ## B12 — Main workspace offline — PASS (limited scope)
 User reports offline image loading, processing, WebP export and page reload all passed. Workshop offline operation, cold launch and fallback encoder availability remain untested. Continue with workshop offline checks.
+
+## Scope revision — 2026-11-27
+User explicitly states offline is no longer a priority. Existing offline behavior may be preserved where practical, but comprehensive offline testing, cold launch and offline dependency availability are no longer mandatory foundation acceptance gates. B12 main workspace passed; remaining offline checks waived, not verified. Offline dependency consolidation is optional rather than required; dependency reliability remains relevant. This revision supersedes earlier conflicting offline requirements for Sprite Factory only.
