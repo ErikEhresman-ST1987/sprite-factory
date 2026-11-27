@@ -1,0 +1,1866 @@
+<!doctype html>
+<!-- Adapted from https://github.com/jerryfemi/glb2sprite; upstream blob 18f6cdc6cf0121af5e1261408aef9757ce042aef; F01-A1 native picker and sample loader. Original license follows.
+MIT License
+
+Copyright (c) 2026 jerryfemi
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Sprite Renderer</title>
+<meta name="description" content="Turn a .glb, .gltf or .fbx 3D model into a game-ready sprite sheet in your browser, including character animations. Nothing is uploaded.">
+</head>
+<body>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap">
+<style>
+  :root {
+    --bg: #0A0E1A;
+    --surface: #0F172A;
+    --surface2: #1E2638;
+    --fg: #FFFFFF;
+    --fg2: #94A3B8;
+    --accent: #38BDF8;
+    --gold: #F59E0B;
+    --green: #00FFCC;
+    --red: #EF4444;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 16px;
+    line-height: 1.5;
+    max-width: 1100px;
+    margin-inline: auto;
+  }
+  h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { color: var(--fg2); font-size: 0.85rem; margin-bottom: 20px; max-width: 65ch; }
+
+  .drop-zone {
+    border: 2px dashed var(--surface2);
+    border-radius: 12px;
+    padding: 36px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .drop-zone:hover, .drop-zone.drag-over, .drop-zone:focus-visible {
+    border-color: var(--accent);
+    background: rgba(56, 189, 248, 0.05);
+    outline: none;
+  }
+  .drop-zone input { display: block; width: 100%; margin: 12px auto; font-size: 16px; }
+  .drop-zone p { color: var(--fg2); font-size: 0.9rem; }
+  .drop-zone .big { color: var(--fg); font-size: 1rem; font-weight: 600; margin-bottom: 6px; }
+  .drop-zone .accent { color: var(--accent); font-weight: 600; }
+
+  .notice {
+    margin-top: 12px;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 0.85rem;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .notice.error { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.4); color: #FCA5A5; }
+  .notice.info { background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.3); color: var(--fg2); }
+  .notice strong { color: var(--fg); }
+
+  .workspace { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
+
+  .viewport-wrap {
+    position: relative;
+    width: 100%;
+    /* Big enough to judge the angle: most of the screen height. */
+    height: min(74vh, 820px);
+    min-height: 320px;
+    background: radial-gradient(circle at 50% 40%, #1E2638, #0A0E1A 75%);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .viewport-wrap canvas { width: 100% !important; height: 100% !important; display: block; }
+  .viewport-hint {
+    position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+    color: var(--fg2); font-size: 0.75rem; background: rgba(0,0,0,0.6);
+    padding: 4px 12px; border-radius: 20px; pointer-events: none; white-space: nowrap;
+  }
+  .frame-guide {
+    position: absolute; inset: 0; margin: auto;
+    height: 86%; aspect-ratio: 1; max-width: 86%;
+    border: 1px dashed rgba(0, 255, 204, 0.35); border-radius: 4px; pointer-events: none;
+  }
+  .credit { font-size: 0.78rem; color: var(--fg2); }
+  .credit strong { color: var(--fg); font-weight: 600; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+  .control-group { background: var(--surface); border-radius: 10px; padding: 14px; min-width: 0; }
+  .control-group h3, .render-section h3 {
+    font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--fg2); margin-bottom: 10px;
+  }
+  .control-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .control-row:last-child { margin-bottom: 0; }
+  .control-row label { font-size: 0.82rem; color: var(--fg2); min-width: 64px; }
+  .control-row input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); }
+  /* − / + beside every slider, for exact steps */
+  .step-btn {
+    flex: 0 0 auto; width: 28px; height: 28px; border: none; border-radius: 8px;
+    background: var(--surface2); color: var(--fg); font-size: 16px; font-weight: 600; line-height: 1;
+    font-family: inherit; cursor: pointer; display: grid; place-items: center; touch-action: manipulation;
+    transition: transform 80ms ease-out, background 80ms ease-out;
+  }
+  .step-btn:hover { background: #2A3448; }
+  .step-btn:active { transform: scale(0.92); }
+  .step-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .control-row .val { font-size: 0.78rem; min-width: 36px; text-align: right; font-variant-numeric: tabular-nums; }
+  .color-pick { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .color-pick input[type="color"] {
+    width: 32px; height: 32px; border: 2px solid var(--surface2); border-radius: 6px;
+    cursor: pointer; background: none; padding: 0;
+  }
+  .color-pick label { font-size: 0.82rem; }
+  .hint { font-size: 0.75rem; color: var(--fg2); }
+
+  .render-section { background: var(--surface); border-radius: 10px; padding: 14px; }
+  .sprite-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .sprite-item { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--fg2); }
+  .sprite-item .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 10px 18px; border: none; border-radius: 8px;
+    font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: opacity 0.15s;
+    font-family: inherit;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary { background: var(--accent); color: var(--bg); flex: 1; }
+  .btn-ghost { background: var(--surface2); color: var(--fg); }
+
+  .progress-bar { height: 4px; background: var(--surface2); border-radius: 2px; margin-top: 10px; overflow: hidden; }
+  .progress-bar .fill { height: 100%; background: var(--green); width: 0%; transition: width 0.2s; }
+  .status { font-size: 0.82rem; color: var(--green); margin-top: 8px; min-height: 1.4em; }
+
+  .output-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+  .output-card { background: var(--surface); border-radius: 8px; padding: 8px; text-align: center; min-width: 0; }
+  .output-card img {
+    width: 100%; height: auto;
+    background: repeating-conic-gradient(#222 0% 25%, #333 0% 50%) 50% / 16px 16px;
+    border-radius: 4px; margin-bottom: 6px;
+  }
+  .output-card .name { font-size: 0.72rem; color: var(--fg2); word-break: break-all; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  .check-row { display: flex; gap: 8px; align-items: flex-start; font-size: 0.82rem; margin-bottom: 8px; }
+  .check-row input { margin-top: 3px; accent-color: var(--accent); }
+  .check-row span { color: var(--fg); }
+  .check-row small { display: block; color: var(--fg2); font-size: 0.75rem; }
+  .text-input, .select {
+    width: 100%; background: var(--bg); color: var(--fg); border: 1px solid var(--surface2);
+    border-radius: 6px; padding: 7px 9px; font: inherit; font-size: 0.85rem;
+  }
+  .text-input:focus-visible, .select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .field { margin-bottom: 10px; }
+  .view-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
+  .view-grid .btn, .nudge .btn { padding: 8px 6px; font-size: 0.8rem; }
+  .nudge { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 10px; }
+  .parts { max-height: 190px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+  .parts label { display: flex; gap: 8px; align-items: center; font-size: 0.8rem; color: var(--fg); min-width: 0; }
+  .parts label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .parts label em { color: var(--gold); font-style: normal; font-size: 0.72rem; flex-shrink: 0; }
+  .parts input { accent-color: var(--accent); flex-shrink: 0; }
+  .anim-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .anim-row input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); }
+  .field label { display: block; font-size: 0.78rem; color: var(--fg2); margin-bottom: 4px; }
+  .clip-row, .mat-row { display: grid; grid-template-columns: auto minmax(0,1fr) auto auto; gap: 8px; align-items: center; font-size: 0.8rem; }
+  .clip-row span, .mat-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .clip-row input[type="number"] { width: 56px; background: var(--bg); color: var(--fg); border: 1px solid var(--surface2); border-radius: 6px; padding: 4px 6px; font: inherit; font-size: 0.8rem; }
+  .clip-row small, .mat-row small { color: var(--fg2); font-size: 0.72rem; display: flex; gap: 4px; align-items: center; }
+  .clip-row input, .mat-row input[type="checkbox"] { accent-color: var(--accent); }
+  .mat-row input[type="color"] { width: 28px; height: 24px; border: 2px solid var(--surface2); border-radius: 5px; background: none; padding: 0; cursor: pointer; }
+</style>
+
+<h1>Sprite Renderer</h1>
+<p class="subtitle">Turn any 3D model (.glb, .gltf or .fbx) into one game-ready sprite sheet: a resting frame, animation frames from one or many clips, an optional spin strip and optional tilted frames, all cropped to the same box. What you see in the dashed square is what gets rendered. Everything runs in your browser; nothing is uploaded.</p>
+
+<div class="drop-zone" id="dropZone" >
+  <p class="big">Choose Model File</p>
+  <p>A single <span class="accent">.glb</span> or <span class="accent">.fbx</span> file (Mixamo downloads work), or <span class="accent">scene.gltf + scene.bin</span> together (plus any texture files)</p>
+  <p style="margin-top:6px;font-size:0.78rem">Choose a file using the native picker, or try the built-in fox below.</p>
+  <input type="file" id="fileInput" accept=".glb,.gltf,.fbx,.bin,.png,.jpg,.jpeg,.webp,.ktx2,.tga" multiple>
+  <button type="button" id="loadTestFox" style="min-height:48px;font-size:16px">Load Test Model — Fox</button>
+  <p id="testFoxStatus" role="status">Ready. Internet required for the sample and renderer.</p>
+</div>
+<div id="loadNotice" hidden></div>
+
+<div class="workspace" id="workspace" hidden>
+  <div class="viewport-wrap" id="viewportWrap">
+    <div class="frame-guide"></div>
+    <div class="viewport-hint">Drag to orbit · Scroll to zoom · Right-drag to pan · Double-click a part to orbit around it</div>
+  </div>
+  <div class="credit" id="credit"></div>
+
+  <div class="controls">
+    <div class="control-group">
+      <h3>View</h3>
+      <div class="view-grid">
+        <button class="btn btn-ghost" type="button" data-view="front">Front</button>
+        <button class="btn btn-ghost" type="button" data-view="back">Back</button>
+        <button class="btn btn-ghost" type="button" data-view="top">Top</button>
+        <button class="btn btn-ghost" type="button" data-view="left">Left</button>
+        <button class="btn btn-ghost" type="button" data-view="right">Right</button>
+        <button class="btn btn-ghost" type="button" data-view="threeq">¾ view</button>
+      </div>
+      <div class="nudge">
+        <button class="btn btn-ghost" type="button" data-nudge="left" aria-label="Turn left">←</button>
+        <button class="btn btn-ghost" type="button" data-nudge="right" aria-label="Turn right">→</button>
+        <button class="btn btn-ghost" type="button" data-nudge="up" aria-label="Look from higher">↑</button>
+        <button class="btn btn-ghost" type="button" data-nudge="down" aria-label="Look from lower">↓</button>
+        <button class="btn btn-ghost" type="button" data-nudge="in" aria-label="Zoom in">+</button>
+        <button class="btn btn-ghost" type="button" data-nudge="out" aria-label="Zoom out">−</button>
+      </div>
+      <div class="control-row">
+        <label for="zoomSlider">Zoom</label>
+        <input type="range" id="zoomSlider" min="0" max="100" step="1" value="50" aria-label="Zoom">
+        <span class="val" id="zoomVal">50</span>
+      </div>
+      <div class="btn-row"><button class="btn btn-ghost" id="frameBtn" type="button" style="flex:1">Frame object</button></div>
+      <p class="hint" style="margin-top:8px">Arrows turn the view 5° (arrow keys too; hold Shift for 1°). Double-click a part to orbit around it.</p>
+    </div>
+
+    <div class="control-group">
+      <h3>Parts</h3>
+      <div class="parts" id="partsList"></div>
+      <p class="hint" id="partsHint">Untick a part to hide it. Hidden parts are left out of renders.</p>
+    </div>
+
+    <div class="control-group" id="matGroup" hidden>
+      <h3>Material colors</h3>
+      <div class="parts" id="matList"></div>
+      <p class="hint">Tick a material to paint it a flat color. Useful when an FBX or OBJ export lost its colors and everything looks white or grey. Untick to get the original back.</p>
+    </div>
+
+    <div class="control-group" id="propGroup" hidden>
+      <h3>Attach a prop</h3>
+      <p class="hint" style="margin-bottom:8px">Put a gun, tool or sword in the character's hand. It follows the bone through every animation.</p>
+      <div class="btn-row" style="margin-bottom:10px"><button class="btn btn-ghost" id="propBtn" type="button" style="flex:1">Choose prop file (.glb or .fbx)…</button><button class="btn btn-ghost" id="propRemove" type="button" hidden>Remove</button></div>
+      <input type="file" id="propInput" accept=".glb,.gltf,.fbx" hidden>
+      <div id="propBlock" hidden>
+        <div class="field"><label for="propBone">Bone</label><select class="select" id="propBone"></select></div>
+        <div class="control-row"><label for="propSize">Length</label><input type="range" id="propSize" min="5" max="120" step="1" value="45" aria-label="Prop length"><span class="val" id="propSizeVal">45%</span></div>
+        <div class="control-row"><label for="propX">Move X</label><input type="range" id="propX" min="-50" max="50" step="1" value="0" aria-label="Prop move X"><span class="val" id="propXVal">0</span></div>
+        <div class="control-row"><label for="propY">Move Y</label><input type="range" id="propY" min="-50" max="50" step="1" value="0" aria-label="Prop move Y"><span class="val" id="propYVal">0</span></div>
+        <div class="control-row"><label for="propZ">Move Z</label><input type="range" id="propZ" min="-50" max="50" step="1" value="0" aria-label="Prop move Z"><span class="val" id="propZVal">0</span></div>
+        <div class="control-row"><label for="propRX">Turn X</label><input type="range" id="propRX" min="-180" max="180" step="5" value="0" aria-label="Prop turn X"><span class="val" id="propRXVal">0°</span></div>
+        <div class="control-row"><label for="propRY">Turn Y</label><input type="range" id="propRY" min="-180" max="180" step="5" value="0" aria-label="Prop turn Y"><span class="val" id="propRYVal">0°</span></div>
+        <div class="control-row"><label for="propRZ">Turn Z</label><input type="range" id="propRZ" min="-180" max="180" step="5" value="0" aria-label="Prop turn Z"><span class="val" id="propRZVal">0°</span></div>
+        <p class="hint">Length is a share of the character's height. Scrub through the animation to check the grip. To hide a gun that came with the character, untick it under Parts.</p>
+      </div>
+    </div>
+
+    <div class="control-group" id="animGroup" hidden>
+      <h3>Animation</h3>
+      <div class="field">
+        <label for="clipSelect">Clip</label>
+        <select class="select" id="clipSelect"></select>
+      </div>
+      <div class="anim-row">
+        <button class="btn btn-ghost" id="playBtn" type="button" style="padding:8px 12px">Play</button>
+        <input type="range" id="scrub" min="0" max="1000" step="1" value="0" aria-label="Animation time">
+        <span class="val" id="scrubVal" style="font-size:0.78rem;min-width:44px;text-align:right">0.00s</span>
+      </div>
+      <div class="control-row">
+        <label for="animFrames">Anim frames</label>
+        <input type="range" id="animFrames" min="0" max="32" step="1" value="8">
+        <span class="val" id="animVal">8</span>
+      </div>
+      <p class="hint">The resting frame uses the pose on the scrub bar. Anim frames is the default frame count for newly ticked clips.</p>
+      <div class="field" style="margin-top:10px">
+        <label>Clips to render (tick one or more; each gets its own frames)</label>
+        <div class="parts" id="clipList"></div>
+      </div>
+      <label class="check-row">
+        <input type="checkbox" id="inPlace" checked>
+        <span>Keep in place<small>Stops walk, run and dodge clips from drifting out of frame. The character animates on the spot, and your game moves it.</small></span>
+      </label>
+      <div class="btn-row"><button class="btn btn-ghost" id="addAnimBtn" type="button" style="flex:1">Add animation files…</button></div>
+      <input type="file" id="animInput" accept=".fbx,.glb,.gltf" multiple hidden>
+      <p class="hint" id="animAddHint" style="margin-top:6px">Add clips from other files made for the same character, such as Mixamo downloads.</p>
+    </div>
+
+    <div class="control-group">
+      <h3>Object</h3>
+      <div class="field">
+        <label for="objName">Name (used for the file names)</label>
+        <input class="text-input" id="objName" type="text" value="darts" spellcheck="false" autocomplete="off">
+      </div>
+      <label class="check-row">
+        <input type="checkbox" id="autoOrient" checked>
+        <span>Auto-orient long objects<small>Points the long axis at the target with the wide end toward you. Good for darts and arrows; turn off for bows, trees and props.</small></span>
+      </label>
+      <div class="control-row">
+        <label for="rotXSlider">Pitch</label>
+        <input type="range" id="rotXSlider" min="-180" max="180" step="1" value="0">
+        <span class="val" id="rotXVal">0°</span>
+      </div>
+      <div class="control-row">
+        <label for="rotYSlider">Yaw</label>
+        <input type="range" id="rotYSlider" min="-180" max="180" step="1" value="0">
+        <span class="val" id="rotYVal">0°</span>
+      </div>
+      <div class="control-row">
+        <label for="rotZSlider">Roll</label>
+        <input type="range" id="rotZSlider" min="-180" max="180" step="1" value="45">
+        <span class="val" id="rotZVal">45°</span>
+      </div>
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn btn-ghost" id="flipBtn" type="button">Flip direction</button>
+        <button class="btn btn-ghost" id="resetViewBtn" type="button">Reset view</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <h3>Colors</h3>
+      <label class="check-row">
+        <input type="checkbox" id="recolor">
+        <span>Recolor the widest parts<small>Off: the model keeps its natural colors and textures. On: the parts that stick out furthest (like dart flights) get the colors below.</small></span>
+      </label>
+      <div id="colorBlock" hidden>
+        <div class="field">
+          <label for="variants">Color versions</label>
+          <select class="select" id="variants">
+            <option value="1">One color</option>
+            <option value="2">Two colors (one row each)</option>
+          </select>
+        </div>
+        <div class="color-pick">
+          <input type="color" id="color1" value="#EF4444">
+          <label for="color1">Color 1</label>
+        </div>
+        <div class="color-pick" id="color2Row" hidden>
+          <input type="color" id="color2" value="#38BDF8">
+          <label for="color2">Color 2</label>
+        </div>
+        <p class="hint" id="colorHint"></p>
+      </div>
+      <h3 style="margin-top:14px">Lighting</h3>
+      <div class="control-row">
+        <label for="keyIntensity">Key</label>
+        <input type="range" id="keyIntensity" min="0" max="4" step="0.1" value="2.2">
+        <span class="val" id="keyVal">2.2</span>
+      </div>
+      <div class="control-row">
+        <label for="rimIntensity">Rim</label>
+        <input type="range" id="rimIntensity" min="0" max="4" step="0.1" value="1.4">
+        <span class="val" id="rimVal">1.4</span>
+      </div>
+      <div class="control-row">
+        <label for="ambIntensity">Ambient</label>
+        <input type="range" id="ambIntensity" min="0" max="2" step="0.05" value="0.6">
+        <span class="val" id="ambVal">0.6</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <h3>Frames</h3>
+      <label class="check-row">
+        <input type="checkbox" id="sweepMode">
+        <span>Angle sweep (3D flight)<small>For a game that draws the object in 3D: one row per viewing angle, from tail-on to side view, one column per spin step. The tip points up in every frame. Needs Auto-orient.</small></span>
+      </label>
+      <div id="sweepBlock" hidden>
+        <div class="control-row">
+          <label for="sweepRows">Angles</label>
+          <input type="range" id="sweepRows" min="4" max="16" step="1" value="12">
+          <span class="val" id="sweepRowsVal">12</span>
+        </div>
+        <div class="control-row">
+          <label for="sweepMin">From</label>
+          <input type="range" id="sweepMin" min="0" max="20" step="1" value="4">
+          <span class="val" id="sweepMinVal">4°</span>
+        </div>
+        <div class="control-row">
+          <label for="sweepMax">To</label>
+          <input type="range" id="sweepMax" min="45" max="90" step="5" value="90">
+          <span class="val" id="sweepMaxVal">90°</span>
+        </div>
+        <button class="btn btn-ghost" id="sweepPreviewBtn" type="button" style="width:100%;margin-bottom:8px">Preview angles</button>
+      </div>
+      <div class="control-row">
+        <label for="spinFrames">Spin frames</label>
+        <input type="range" id="spinFrames" min="0" max="16" step="1" value="8">
+        <span class="val" id="spinVal">8</span>
+      </div>
+      <div class="field">
+        <label for="spinRange">Spin covers</label>
+        <select class="select" id="spinRange">
+          <option value="90">90° (four-way symmetric, like dart flights or arrow fletching)</option>
+          <option value="120">120° (three-way symmetric)</option>
+          <option value="360">360° (full turn)</option>
+        </select>
+      </div>
+      <div id="classicBlock">
+      <div class="control-row">
+        <label for="tiltFrames">Tilted frames</label>
+        <input type="range" id="tiltFrames" min="0" max="5" step="1" value="3">
+        <span class="val" id="tiltVal">3</span>
+      </div>
+      <p class="hint">Tilted frames lean left, straight and right, like a dart or arrow stuck in a target. 0 turns them off.</p>
+      </div>
+      <h3 style="margin-top:14px">Output</h3>
+      <div class="control-row">
+        <label for="outSize">Render size</label>
+        <input type="range" id="outSize" min="128" max="1024" step="64" value="512">
+        <span class="val" id="outSizeVal">512</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="render-section">
+    <h3>Render</h3>
+    <div class="sprite-list" id="spriteList"></div>
+    <button class="btn btn-primary" id="renderBtn" type="button" style="width:100%">Render sprite sheet</button>
+    <div class="progress-bar" id="progressBar" hidden><div class="fill" id="progressFill"></div></div>
+    <div class="status" id="status"></div>
+    <div id="saveRow" hidden style="margin-top:12px">
+      <button class="btn btn-primary" id="saveBtn" type="button" style="width:100%;background:var(--green)">Save sprites (.zip)</button>
+      <p class="hint" id="saveNote" style="margin-top:6px"></p>
+    </div>
+  </div>
+
+  <div class="output-grid" id="outputGrid"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+
+(function () {
+  'use strict';
+
+  const $ = id => document.getElementById(id);
+  const dropZone = $('dropZone'), fileInput = $('fileInput'), loadNotice = $('loadNotice');
+  const workspace = $('workspace'), viewportWrap = $('viewportWrap');
+  const renderBtn = $('renderBtn'), progressBar = $('progressBar'), progressFill = $('progressFill');
+  const statusEl = $('status'), outputGrid = $('outputGrid');
+  const saveRow = $('saveRow'), saveBtn = $('saveBtn'), saveNote = $('saveNote');
+
+  function notice(kind, html) {
+    loadNotice.className = 'notice ' + kind;
+    loadNotice.innerHTML = '<div>' + html + '</div>';
+    loadNotice.hidden = false;
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  const fileName = () => ($('objName').value.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || 'sprite');
+
+  if (!THREE || !GLTFLoader) {
+    notice('error', '<strong>The 3D engine did not load.</strong> Check your internet connection and reload the page.');
+    return;
+  }
+
+  // Scene graph: pivot (pose sliders) > spin (frame roll) > fit (scale) > align (auto orient) > model
+  let scene, camera, renderer, controls, keyLight, rimLight, ambLight;
+  let pivot, spin, fit, align, model = null, currentGltf = null;
+  let flightMats = [];
+  const originals = new Map();   // material -> { color, map } so natural colors can always come back
+  let objectUrls = [];
+  const DEFAULT_CAM = new THREE.Vector3(1.1, 0.9, 2.6);
+  const v = new THREE.Vector3();
+
+  // Animation state (declared early: describeOutput reads it)
+  let mixer = null, clips = [], currentClip = null, currentAction = null, playing = false;
+  let clipState = [];   // per clip: { on, frames, loop }
+  let rootBone = null;
+  const clock = new THREE.Clock();
+
+  // ---------- Controls ----------
+  [
+    ['rotXSlider', 'rotXVal', x => x + '°'],
+    ['rotYSlider', 'rotYVal', x => x + '°'],
+    ['rotZSlider', 'rotZVal', x => x + '°'],
+    ['keyIntensity', 'keyVal', x => x],
+    ['rimIntensity', 'rimVal', x => x],
+    ['ambIntensity', 'ambVal', x => x],
+    ['outSize', 'outSizeVal', x => x],
+    ['spinFrames', 'spinVal', x => x],
+    ['tiltFrames', 'tiltVal', x => x],
+    ['sweepRows', 'sweepRowsVal', x => x],
+    ['sweepMin', 'sweepMinVal', x => x + '°'],
+    ['sweepMax', 'sweepMaxVal', x => x + '°'],
+    ['animFrames', 'animVal', x => x],
+    ['propSize', 'propSizeVal', x => x + '%'],
+    ['propX', 'propXVal', x => x],
+    ['propY', 'propYVal', x => x],
+    ['propZ', 'propZVal', x => x],
+    ['propRX', 'propRXVal', x => x + '°'],
+    ['propRY', 'propRYVal', x => x + '°'],
+    ['propRZ', 'propRZVal', x => x + '°'],
+  ].forEach(([sid, vid, fmt]) => {
+    const s = $(sid);
+    s.addEventListener('input', () => { $(vid).textContent = fmt(s.value); applyPose(); describeOutput(); });
+  });
+  $('recolor').addEventListener('change', () => { $('colorBlock').hidden = !$('recolor').checked; applyColor(0); describeOutput(); });
+  $('variants').addEventListener('change', () => { $('color2Row').hidden = $('variants').value !== '2'; describeOutput(); });
+  $('color1').addEventListener('input', () => applyColor(0));
+  $('spinRange').addEventListener('change', describeOutput);
+  $('sweepPreviewBtn').addEventListener('click', async () => {
+    if (!model) return;
+    renderBtn.disabled = true; $('sweepPreviewBtn').disabled = true;
+    saveRow.hidden = true; outputGrid.innerHTML = '';
+    try { await renderSweep(true); } catch (err) { statusEl.textContent = 'Preview failed: ' + err.message; }
+    finally { rendering = false; }
+    renderBtn.disabled = false; $('sweepPreviewBtn').disabled = false;
+    progressBar.hidden = true;
+  });
+  $('sweepMode').addEventListener('change', () => {
+    const on = $('sweepMode').checked;
+    $('sweepBlock').hidden = !on;
+    $('classicBlock').hidden = on;
+    if (on && !$('autoOrient').checked) { $('autoOrient').checked = true; if (currentGltf) setupModel(currentGltf); }
+    if (on && +$('outSize').value > 256) { $('outSize').value = 256; $('outSizeVal').textContent = '256'; }
+    describeOutput();
+  });
+  $('objName').addEventListener('input', describeOutput);
+  $('autoOrient').addEventListener('change', () => { if (currentGltf) { setupModel(currentGltf); } });
+
+  function describeOutput() {
+    if ($('sweepMode').checked) {
+      const rowsN = +$('sweepRows').value, spinN = Math.max(1, +$('spinFrames').value);
+      const colorN = $('recolor').checked ? +$('variants').value : 1;
+      const list = [
+        rowsN + ' viewing angles from ' + $('sweepMin').value + '° (tail-on) to ' + $('sweepMax').value + '° (side view), one row each',
+        spinN + ' spin step' + (spinN > 1 ? 's' : '') + ' across ' + $('spinRange').value + '°, one column each',
+        rowsN * spinN * colorN + ' frames in total, tip pointing up in every frame',
+        $('recolor').checked ? colorN + ' color version' + (colorN > 1 ? 's' : '') : 'Natural colors and textures',
+      ];
+      $('spriteList').innerHTML = list.map(t => '<div class="sprite-item"><div class="dot"></div> ' + escapeHtml(t) + '</div>').join('');
+      saveNote.textContent = 'Contains ' + fileName() + '_sweep.png and ' + fileName() + '_sweep.json (the angle of each row, where the tip and centre sit in each cell).';
+      return;
+    }
+    const spinN = +$('spinFrames').value, tiltN = +$('tiltFrames').value;
+    const rows = $('recolor').checked ? +$('variants').value : 1;
+    const items = ['1 resting frame from the current camera view'];
+    const sel = selectedClips();
+    if (sel.length === 1) items.push(sel[0].frames + ' animation frames from "' + sel[0].clip.name + '"');
+    else if (sel.length > 1) items.push(sel.reduce((a, c) => a + c.frames, 0) + ' animation frames from ' + sel.length + ' clips: ' + sel.map(c => c.clip.name + ' (' + c.frames + ')').join(', '));
+    if (spinN) items.push(spinN + ' spin frames across ' + $('spinRange').value + '° (they loop)');
+    if (tiltN) items.push(tiltN + ' tilted frame' + (tiltN > 1 ? 's' : '') + (tiltN > 1 ? ', leaning left to right' : ''));
+    items.push($('recolor').checked ? rows + ' color version' + (rows > 1 ? 's, one row each' : '') : 'Natural colors and textures');
+    $('spriteList').innerHTML = items.map(t => '<div class="sprite-item"><div class="dot"></div> ' + escapeHtml(t) + '</div>').join('');
+    saveNote.textContent = 'Contains ' + fileName() + '_atlas.png (every frame on one sheet) and ' + fileName() + '_atlas.json (where each frame sits).';
+  }
+  describeOutput();
+
+  // − / + on both sides of every slider. Tap for one step, hold to repeat.
+  document.querySelectorAll('input[type="range"]').forEach(r => {
+    const make = (dir) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'step-btn';
+      b.textContent = dir < 0 ? '\u2212' : '+';
+      b.setAttribute('aria-label', (dir < 0 ? 'Decrease ' : 'Increase ') + (r.getAttribute('aria-label') || r.id));
+      const nudgeOnce = () => {
+        const step = parseFloat(r.step) || 1;
+        const v = Math.min(parseFloat(r.max), Math.max(parseFloat(r.min), parseFloat(r.value) + dir * step));
+        const dec = (String(r.step).split('.')[1] || '').length;
+        r.value = v.toFixed(dec);
+        r.dispatchEvent(new Event('input', { bubbles: true }));
+        r.dispatchEvent(new Event('change', { bubbles: true }));
+      };
+      let hold = null, repeat = null;
+      const stop = () => { clearTimeout(hold); clearInterval(repeat); hold = repeat = null; };
+      b.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        nudgeOnce();
+        hold = setTimeout(() => { repeat = setInterval(nudgeOnce, 60); }, 350);
+      });
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => b.addEventListener(t, stop));
+      b.addEventListener('click', (e) => { if (e.detail === 0) nudgeOnce(); }); // keyboard
+      return b;
+    };
+    r.before(make(-1));
+    r.after(make(1));
+  });
+
+  // ---------- File loading ----------
+
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', async e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    handleFiles(await collectDropped(e.dataTransfer));
+  });
+  fileInput.addEventListener('change', () => { handleFiles(Array.from(fileInput.files)); fileInput.value = ''; });
+
+  $('loadTestFox').addEventListener('click', async () => {
+    const button = $('loadTestFox'), status = $('testFoxStatus');
+    button.disabled = true;
+    status.textContent = 'Downloading fox…';
+    try {
+      const response = await fetch('https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Fox/glTF-Binary/Fox.glb');
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const blob = await response.blob();
+      status.textContent = 'Fox downloaded. Loading model; see renderer status below.';
+      await handleFiles([new File([blob], 'Fox.glb', {type:'model/gltf-binary'})]);
+    } catch (error) {
+      status.textContent = 'Sample import failed: ' + error.message;
+    } finally { button.disabled = false; }
+  });
+  async function collectDropped(dt) {
+    const items = dt.items ? Array.from(dt.items) : [];
+    const entries = items.map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+    if (!entries.length) return Array.from(dt.files);
+    const out = [];
+    async function walk(entry) {
+      if (entry.isFile) {
+        await new Promise(res => entry.file(f => { out.push(f); res(); }, res));
+      } else if (entry.isDirectory) {
+        const reader = entry.createReader();
+        let batch;
+        do {
+          batch = await new Promise(res => reader.readEntries(res, () => res([])));
+          for (const child of batch) await walk(child);
+        } while (batch.length);
+      }
+    }
+    for (const en of entries) await walk(en);
+    return out;
+  }
+
+  const baseName = p => decodeURIComponent(p.split(/[\\/]/).pop().split('?')[0]);
+
+  async function handleFiles(files) {
+    if (!files.length) return;
+    const main = files.find(f => /\.glb$/i.test(f.name)) || files.find(f => /\.gltf$/i.test(f.name)) || files.find(f => /\.fbx$/i.test(f.name));
+    if (!main) {
+      notice('error', '<strong>No model file found.</strong> Choose a <strong>.glb</strong> or <strong>.fbx</strong> file, or a <strong>.gltf</strong> file together with its <strong>.bin</strong> file.');
+      return;
+    }
+    objectUrls.forEach(u => URL.revokeObjectURL(u));
+    objectUrls = [];
+    const urlMap = {};
+    files.forEach(f => { const u = URL.createObjectURL(f); objectUrls.push(u); urlMap[f.name] = u; });
+
+    if (/\.gltf$/i.test(main.name)) {
+      let json;
+      try { json = JSON.parse(await main.text()); }
+      catch (err) { notice('error', '<strong>That .gltf file could not be read.</strong> It may be damaged. Download it again.'); return; }
+      const needed = []
+        .concat((json.buffers || []).map(b => b.uri))
+        .concat((json.images || []).map(i => i.uri))
+        .filter(u => u && !u.startsWith('data:'))
+        .map(baseName);
+      const missing = needed.filter(n => !urlMap[n]);
+      if (missing.length) {
+        notice('error',
+          '<strong>Missing ' + missing.length + ' file' + (missing.length > 1 ? 's' : '') + ':</strong> ' + escapeHtml(missing.join(', ')) +
+          '.<br>A .gltf file only describes the model; its shape and textures live in these files next to it in the unzipped folder. Drop them in together with the .gltf, or drop the whole folder.');
+        return;
+      }
+    }
+
+    notice('info', 'Loading model…');
+    const manager = new THREE.LoadingManager();
+    // A .gltf loaded from a blob: URL resolves "scene.bin" to "blob:<origin>/scene.bin",
+    // so always match by file name first.
+    manager.setURLModifier(url => url.startsWith('data:') ? url : (urlMap[baseName(url)] || url));
+    const onLoaded = gltf => {
+      try {
+        originals.clear();
+        removeProp(true);
+        currentGltf = gltf;
+        const guess = main.name.replace(/\.(glb|gltf|fbx)$/i, '');
+        if ($('objName').value === 'darts' && guess && guess !== 'scene') $('objName').value = guess;
+        // Characters are not long thin objects: auto-orient would lay them down.
+        let skinned = false;
+        gltf.scene.traverse(o => { if (o.isSkinnedMesh) skinned = true; });
+        if (skinned && !$('sweepMode').checked) {
+          // Characters: no auto-orient, no roll, no spin or tilt frames (they are for darts and arrows).
+          $('autoOrient').checked = false;
+          [['rotZSlider', 'rotZVal', '0°'], ['spinFrames', 'spinVal', '0'], ['tiltFrames', 'tiltVal', '0']].forEach(([id, vid, t]) => { $(id).value = 0; $(vid).textContent = t; });
+        }
+        matEntries = [];
+        setupModel(gltf);
+        setupAnimations(gltf);
+        buildPartsList();
+        buildMaterialList();
+        setupPropBones();
+        loadNotice.hidden = true;
+        const ex = (gltf.parser && gltf.parser.json.asset && gltf.parser.json.asset.extras) || {};
+        $('credit').innerHTML = ex.author
+          ? 'Model: <strong>' + escapeHtml(ex.title || 'Untitled') + '</strong> by ' + escapeHtml(ex.author) +
+            ' · ' + escapeHtml(ex.license || 'license unknown') + '. If the license is CC-BY, credit the author in the game.'
+          : '';
+        describeOutput();
+        statusEl.textContent = skinned
+          ? 'Animated model loaded. Auto-orient, roll, spin and tilt frames were turned off for it. Pick a view (Back or Front), choose clips, then render.'
+          : 'Model loaded. Orbit the camera to the angle you want, then render.';
+      } catch (err) {
+        notice('error', '<strong>The model loaded but could not be set up:</strong> ' + escapeHtml(err.message));
+      }
+    };
+    const onError = err => {
+      notice('error', '<strong>The model could not be loaded.</strong> ' + escapeHtml((err && err.message) || String(err)) +
+        '<br>If you have a .glb version of the model, try that; it is one self-contained file.');
+    };
+    if (/\.fbx$/i.test(main.name)) {
+      new FBXLoader(manager).load(urlMap[main.name], obj => onLoaded({ scene: obj, animations: obj.animations || [] }), undefined, onError);
+    } else {
+      makeLoader(manager).load(urlMap[main.name], onLoaded, undefined, onError);
+    }
+  }
+
+  // Loads one extra file (animations or a prop) from a File, .glb/.gltf (self-contained) or .fbx.
+  function loadSingle(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const done = r => { URL.revokeObjectURL(url); resolve(r); };
+      const fail = e => { URL.revokeObjectURL(url); reject(e); };
+      if (/\.fbx$/i.test(file.name)) new FBXLoader().load(url, o => done({ scene: o, animations: o.animations || [] }), undefined, fail);
+      else makeLoader(new THREE.LoadingManager()).load(url, done, undefined, fail);
+    });
+  }
+
+  // Loader that also opens Draco- and Meshopt-compressed models (common on
+  // Sketchfab and in asset packs).
+  function makeLoader(manager) {
+    const draco = new DRACOLoader(manager);
+    draco.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/gltf/');
+    return new GLTFLoader(manager).setDRACOLoader(draco).setMeshoptDecoder(MeshoptDecoder);
+  }
+
+  // ---------- Scene ----------
+  function initScene() {
+    if (scene) return;
+    workspace.hidden = false;
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(30, 4 / 3, 0.01, 1000);
+    camera.position.copy(DEFAULT_CAM);
+
+    renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0x000000, 0);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    viewportWrap.insertBefore(renderer.domElement, viewportWrap.firstChild);
+
+    keyLight = new THREE.DirectionalLight(0xFFE2B8, 2.2);   // warm key
+    keyLight.position.set(2, 4, 3);
+    scene.add(keyLight);
+    rimLight = new THREE.DirectionalLight(0x38BDF8, 1.4);   // sky-blue rim to match the obsidian UI
+    rimLight.position.set(-3, 1, -3);
+    scene.add(rimLight);
+    ambLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambLight);
+
+    pivot = new THREE.Group(); spin = new THREE.Group(); fit = new THREE.Group(); align = new THREE.Group();
+    pivot.add(spin); spin.add(fit); fit.add(align); scene.add(pivot);
+
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    // The model is scaled to fit ~2 units: never zoom through it or so far
+    // out that it vanishes.
+    controls.minDistance = 0.6;
+    controls.maxDistance = 25;
+
+    // Zoom slider <-> camera distance (log scale, so each step feels even).
+    // Moves the preview camera only; renders always fit the whole object.
+    const zoomEl = $('zoomSlider');
+    const lnMin = Math.log(controls.minDistance), lnMax = Math.log(controls.maxDistance);
+    const syncZoom = () => {
+      const d = camera.position.distanceTo(controls.target);
+      const z = Math.round(100 * (lnMax - Math.log(d)) / (lnMax - lnMin));
+      const c = Math.max(0, Math.min(100, z));
+      if (+zoomEl.value !== c) { zoomEl.value = c; $('zoomVal').textContent = c; }
+    };
+    controls.addEventListener('change', syncZoom);
+    zoomEl.addEventListener('input', () => {
+      const z = +zoomEl.value;
+      $('zoomVal').textContent = z;
+      const d = Math.exp(lnMax - (z / 100) * (lnMax - lnMin));
+      const dir = camera.position.clone().sub(controls.target).normalize();
+      camera.position.copy(controls.target).addScaledVector(dir, d);
+      controls.update();
+    });
+    renderer.domElement.addEventListener('dblclick', onDoubleClick);
+    controls.dampingFactor = 0.08;
+
+    const resize = () => {
+      const r = viewportWrap.getBoundingClientRect();
+      if (!r.width) return;
+      camera.aspect = r.width / r.height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(r.width, r.height, false);
+    };
+    window.addEventListener('resize', resize);
+    resize();
+
+    (function loop() {
+      requestAnimationFrame(loop);
+      const dt = clock.getDelta();
+      stepTween();
+      if (mixer && playing && !rendering) {
+        mixer.update(dt);
+        lockRoot();
+        syncScrub();
+      }
+      controls.update();
+      renderer.render(scene, camera);
+    })();
+  }
+
+  function setupModel(gltf) {
+    initScene();
+    if (model) align.remove(model);
+    model = gltf.scene;
+    align.quaternion.identity(); align.position.set(0, 0, 0); fit.scale.setScalar(1);
+    align.add(model);
+    scene.updateMatrixWorld(true);
+
+    if (!model.userData.__junkChecked) { hideBackdrops(model); model.userData.__junkChecked = true; }
+
+    const pts = [];
+    model.traverse(o => {
+      if (!o.isMesh || !isShown(o)) return;
+      const p = o.geometry.attributes.position;
+      for (let i = 0; i < p.count; i++) pts.push(v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld).clone());
+    });
+    if (!pts.length) throw new Error('the file has no meshes');
+
+    if ($('autoOrient').checked) {
+      // Long axis -> Z, wide end (flights/fletching) toward the camera (+Z)
+      const size = new THREE.Box3().setFromPoints(pts).getSize(new THREE.Vector3());
+      const axis = size.x >= size.y && size.x >= size.z ? new THREE.Vector3(1, 0, 0)
+                 : size.y >= size.z ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
+      const q = new THREE.Quaternion().setFromUnitVectors(axis, new THREE.Vector3(0, 0, 1));
+      const rotated = pts.map(p => p.clone().applyQuaternion(q));
+      const rb = new THREE.Box3().setFromPoints(rotated);
+      const len = rb.max.z - rb.min.z;
+      const c = rb.getCenter(new THREE.Vector3());
+      let lowR = 0, highR = 0;
+      rotated.forEach(p => {
+        const r = Math.hypot(p.x - c.x, p.y - c.y);
+        if (p.z < rb.min.z + len * 0.2) lowR = Math.max(lowR, r);
+        if (p.z > rb.max.z - len * 0.2) highR = Math.max(highR, r);
+      });
+      if (lowR > highR) q.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI));
+      align.quaternion.copy(q);
+      scene.updateMatrixWorld(true);
+      align.position.sub(new THREE.Box3().setFromObject(align).getCenter(new THREE.Vector3()));
+      fit.scale.setScalar(2 / len);
+    } else {
+      // Keep the model's own orientation; just center it and fit its largest side to 2 units
+      const box = new THREE.Box3().setFromPoints(pts);
+      const size = box.getSize(new THREE.Vector3());
+      align.position.sub(box.getCenter(new THREE.Vector3()));
+      fit.scale.setScalar(2 / Math.max(size.x, size.y, size.z));
+    }
+
+    // Clone materials once per load and remember the natural look
+    if (!model.userData.__cloned) {
+      model.traverse(o => {
+        if (!o.isMesh) return;
+        o.material = Array.isArray(o.material) ? o.material.map(m => m.clone()) : o.material.clone();
+        (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => {
+          if (m.color) originals.set(m, { color: m.color.clone(), map: m.map || null });
+        });
+      });
+      model.userData.__cloned = true;
+    }
+
+    // Recolor targets: the parts that reach furthest from the center line (dart flights, fletching).
+    // Shape-based, so it also works when the colors are baked into a texture.
+    flightMats = [];
+    scene.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(fit.matrixWorld).invert();
+    const parts = [];
+    model.traverse(o => {
+      if (!o.isMesh || !isShown(o)) return;
+      const m4 = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld);
+      const pos = o.geometry.attributes.position;
+      let r = 0;
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(m4);
+        r = Math.max(r, Math.hypot(v.x, v.y));
+      }
+      parts.push({ o, r });
+    });
+    const maxR = Math.max(...parts.map(p => p.r));
+    const mats = o => Array.isArray(o.material) ? o.material : [o.material];
+    if (parts.length > 1) {
+      parts.filter(p => p.r > maxR * 0.6).forEach(p => mats(p.o).forEach(m => { if (m.color && !flightMats.includes(m)) flightMats.push(m); }));
+    } else {
+      parts.forEach(p => mats(p.o).forEach(m => {
+        if (!m.color) return;
+        const hsl = {}; originals.get(m).color.getHSL(hsl);
+        if (hsl.s > 0.35 && hsl.l > 0.08) flightMats.push(m);
+      }));
+    }
+    $('colorHint').textContent = flightMats.length
+      ? flightMats.length + ' part' + (flightMats.length > 1 ? 's' : '') + ' will be recolored. The preview shows color 1.'
+      : 'No separate wide parts were found in this model, so recoloring has nothing to change.';
+
+    applyColor(0);
+    resetView();
+    applyPose();
+  }
+
+  // variant 0 = color 1, variant 1 = color 2. With recolor off, restore the natural look.
+  function applyColor(variant) {
+    const on = $('recolor').checked;
+    const hex = variant === 1 ? $('color2').value : $('color1').value;
+    flightMats.forEach(m => {
+      const o = originals.get(m);
+      if (on) {
+        m.color.set(hex);   // three.js converts the sRGB picker color to linear itself
+        m.map = null;                              // a texture would hide the new color
+      } else if (o) {
+        m.color.copy(o.color);
+        m.map = o.map;
+      }
+      m.needsUpdate = true;
+    });
+    applyMaterialOverrides();
+  }
+
+  // ---------- Material colors (paint by material name) ----------
+  // Asset packs exported to FBX/OBJ often lose their colors but keep material names.
+  const MATERIAL_PRESETS = {
+    metal: '#3A3F47', darkermetal: '#2E3238', black: '#1A1C20', barrels: '#2B2F35', barrel: '#2B2F35',
+    darkwood: '#5B3A22', lightwood: '#8A5A35', wood: '#6B4428', muzzle: '#2E3238', magazine: '#2E3238',
+    bulletorange: '#F97316', bulletyellow: '#FACC15', grey: '#6B7280', gray: '#6B7280',
+  };
+  let matEntries = [];   // { name, mats: [], on, hex }
+  function buildMaterialList() {
+    const byName = new Map();
+    model.traverse(o => {
+      if (!o.isMesh) return;
+      (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => {
+        if (!m || !m.color) return;
+        const n = m.name || 'Unnamed';
+        if (!byName.has(n)) byName.set(n, []);
+        if (!byName.get(n).includes(m)) byName.get(n).push(m);
+      });
+    });
+    const prev = new Map(matEntries.map(e => [e.name, e]));
+    // Colors count as lost when every untextured material came out the same plain grey or white.
+    const plain = [];
+    byName.forEach(ms => ms.forEach(m => { const o = originals.get(m); if (o && !m.map) plain.push(o.color); }));
+    const lost = plain.length > 1 && plain.every(c => Math.abs(c.r - plain[0].r) < 0.02 && Math.abs(c.g - plain[0].g) < 0.02 && Math.abs(c.b - plain[0].b) < 0.02 && Math.abs(c.r - c.g) < 0.02 && Math.abs(c.g - c.b) < 0.02);
+    matEntries = [...byName.entries()].map(([name, mats]) => {
+      const key = name.toLowerCase().replace(/[^a-z]/g, '');
+      const o = originals.get(mats[0]);
+      const allPlain = mats.every(m => { const c = (originals.get(m) || {}).color; return c && !m.map && Math.abs(c.r - c.g) < 0.02 && Math.abs(c.g - c.b) < 0.02; });
+      const allWhite = mats.every(m => { const c = (originals.get(m) || {}).color; return c && !m.map && c.r > 0.95 && c.g > 0.95 && c.b > 0.95; });
+      const p = prev.get(name);
+      return {
+        name, mats,
+        on: p ? p.on : !!(MATERIAL_PRESETS[key] && (lost || allWhite)),
+        hex: p ? p.hex : (MATERIAL_PRESETS[key] || ('#' + (o ? o.color.getHexString(THREE.SRGBColorSpace) : 'ffffff'))),
+      };
+    });
+    const list = $('matList');
+    list.innerHTML = '';
+    matEntries.forEach(e => {
+      const row = document.createElement('label');
+      row.className = 'mat-row';
+      const box = document.createElement('input'); box.type = 'checkbox'; box.checked = e.on;
+      const name = document.createElement('span'); name.textContent = e.name; name.title = e.name;
+      const col = document.createElement('input'); col.type = 'color'; col.value = e.hex;
+      col.setAttribute('aria-label', 'Color for ' + e.name);
+      const n = document.createElement('small'); n.textContent = e.mats.length > 1 ? '×' + e.mats.length : '';
+      box.addEventListener('change', () => { e.on = box.checked; applyColor(0); });
+      col.addEventListener('input', () => { e.hex = col.value; if (!e.on) { e.on = true; box.checked = true; } applyColor(0); });
+      row.append(box, name, n, col);
+      list.appendChild(row);
+    });
+    $('matGroup').hidden = !matEntries.length;
+    applyColor(0);
+  }
+  function applyMaterialOverrides() {
+    matEntries.forEach(e => e.mats.forEach(m => {
+      const o = originals.get(m);
+      if (e.on) { m.color.set(e.hex); m.map = null; }
+      else if (o && !flightMats.includes(m)) { m.color.copy(o.color); m.map = o.map; }
+      m.needsUpdate = true;
+    }));
+  }
+
+  function applyPose() {
+    if (!pivot) return;
+    const d = Math.PI / 180;
+    pivot.rotation.set($('rotXSlider').value * d, $('rotYSlider').value * d, 0);
+    spin.rotation.set(0, 0, $('rotZSlider').value * d);
+    // three.js r155+ uses physical light units: x PI keeps the old look.
+    keyLight.intensity = +$('keyIntensity').value * Math.PI;
+    rimLight.intensity = +$('rimIntensity').value * Math.PI;
+    ambLight.intensity = +$('ambIntensity').value * Math.PI;
+  }
+
+  function resetView() {
+    camera.position.copy(DEFAULT_CAM);
+    controls.target.set(0, 0, 0);
+    controls.update();
+  }
+
+  // ---------- Backdrops and parts ----------
+  // Sketchfab downloads are often whole scenes: a sky dome, floor or backdrop
+  // around the object. Hide meshes that surround or dwarf everything else so
+  // the camera fits the object, not the globe.
+  function isShown(o) {
+    for (let p = o; p; p = p.parent) if (!p.visible) return false;
+    return true;
+  }
+  function meshList(root) {
+    const out = [];
+    root.traverse(o => { if (o.isMesh) out.push(o); });
+    return out;
+  }
+  function hideBackdrops(root) {
+    const meshes = meshList(root);
+    if (meshes.length < 2) return;
+    root.updateMatrixWorld(true);
+    const boxes = meshes.map(m => new THREE.Box3().setFromObject(m));
+    const diag = b => b.getSize(new THREE.Vector3()).length();
+    const flagged = [];
+    meshes.forEach((m, i) => {
+      const others = new THREE.Box3();
+      boxes.forEach((b, j) => { if (j !== i && flagged.indexOf(j) < 0) others.union(b); });
+      if (others.isEmpty()) return;
+      const dO = diag(others), dM = diag(boxes[i]);
+      const shrunk = others.clone().expandByScalar(-dO * 0.02);
+      const surrounds = boxes[i].containsBox(shrunk) && dM > dO * 1.6;
+      const dwarfs = dM > dO * 4;
+      if (surrounds || dwarfs) flagged.push(i);
+    });
+    if (flagged.length >= meshes.length) return;   // never hide everything
+    flagged.forEach(i => { meshes[i].visible = false; meshes[i].userData.__backdrop = true; });
+  }
+  function partName(m, i) {
+    const mat = Array.isArray(m.material) ? m.material[0] : m.material;
+    return m.name || (mat && mat.name) || ('Part ' + (i + 1));
+  }
+  function buildPartsList() {
+    const list = $('partsList');
+    list.innerHTML = '';
+    const meshes = meshList(model);
+    meshes.forEach((m, i) => {
+      const row = document.createElement('label');
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.checked = m.visible;
+      box.addEventListener('change', () => { m.visible = box.checked; });
+      const name = document.createElement('span');
+      name.textContent = partName(m, i);
+      name.title = name.textContent;
+      row.append(box, name);
+      if (m.userData.__backdrop) {
+        const tag = document.createElement('em');
+        tag.textContent = 'backdrop';
+        row.append(tag);
+      }
+      list.appendChild(row);
+    });
+    const hidden = meshes.filter(m => m.userData.__backdrop).length;
+    $('partsHint').textContent = (hidden
+      ? hidden + ' backdrop part' + (hidden > 1 ? 's were' : ' was') + ' hidden automatically. '
+      : '') + 'Untick a part to hide it; hidden parts are left out of renders. Press Frame object after changing parts.';
+  }
+
+  // ---------- Camera moves ----------
+  let tween = null;
+  function moveCamera(toPos, toTarget, ms) {
+    tween = {
+      p0: camera.position.clone(), p1: toPos.clone(),
+      t0: controls.target.clone(), t1: toTarget.clone(),
+      start: performance.now(), ms: ms || 420
+    };
+  }
+  function stepTween() {
+    if (!tween) return;
+    const k = Math.min(1, (performance.now() - tween.start) / tween.ms);
+    const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;   // ease in-out
+    camera.position.lerpVectors(tween.p0, tween.p1, e);
+    controls.target.lerpVectors(tween.t0, tween.t1, e);
+    if (k >= 1) tween = null;
+  }
+  const VIEWS = {
+    front: [0, 0, 1], back: [0, 0, -1], left: [-1, 0, 0], right: [1, 0, 0],
+    top: [0, 1, 0.0001], threeq: [1, 0.7, 1]
+  };
+  document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
+    if (!model) return;
+    const d = VIEWS[b.dataset.view];
+    const dist = camera.position.distanceTo(controls.target);
+    const dir = new THREE.Vector3(d[0], d[1], d[2]).normalize();
+    moveCamera(controls.target.clone().addScaledVector(dir, dist), controls.target);
+  }));
+
+  const sph = new THREE.Spherical();
+  function nudge(kind, deg) {
+    if (!model) return;
+    tween = null;
+    const off = camera.position.clone().sub(controls.target);
+    sph.setFromVector3(off);
+    const r = deg * Math.PI / 180;
+    if (kind === 'left') sph.theta -= r;
+    if (kind === 'right') sph.theta += r;
+    if (kind === 'up') sph.phi = Math.max(0.01, sph.phi - r);
+    if (kind === 'down') sph.phi = Math.min(Math.PI - 0.01, sph.phi + r);
+    if (kind === 'in') sph.radius = Math.max(controls.minDistance, sph.radius * 0.9);
+    if (kind === 'out') sph.radius = Math.min(controls.maxDistance, sph.radius / 0.9);
+    camera.position.copy(controls.target).add(off.setFromSpherical(sph));
+  }
+  document.querySelectorAll('[data-nudge]').forEach(b =>
+    b.addEventListener('click', () => nudge(b.dataset.nudge, 5)));
+  window.addEventListener('keydown', e => {
+    if (!model || workspace.hidden) return;
+    const tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    const map = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', '+': 'in', '=': 'in', '-': 'out' };
+    const k = map[e.key];
+    if (!k) return;
+    e.preventDefault();
+    nudge(k, e.shiftKey ? 1 : 5);
+  });
+
+  $('frameBtn').addEventListener('click', () => { if (currentGltf) setupModel(currentGltf); });
+
+  // Double-click a part: orbit around that point instead of the scene center.
+  const ray = new THREE.Raycaster();
+  function onDoubleClick(e) {
+    if (!model) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const hit = ray.intersectObject(model, true).find(h => isShown(h.object));
+    if (!hit) return;
+    const shift = hit.point.clone().sub(controls.target);
+    moveCamera(camera.position.clone().add(shift), hit.point);
+  }
+
+  // ---------- Animation ----------
+  let rendering = false;
+  const rootRest = new THREE.Vector3();
+  const isOneShot = name => /death|die|hit|recieve|receive|jump|interact|crouch_to|to_stand|reload|fire|shoot|slash|punch|kick|wave|roll/i.test(name || '');
+
+  function findRootBone(root) {
+    let first = null, hips = null;
+    root.traverse(o => {
+      if (!(o.isBone || o.type === 'Bone')) return;
+      if (!first) first = o;
+      if (!hips && /hips|pelvis/i.test(o.name)) hips = o;
+    });
+    return hips || first;
+  }
+  // Keep in place: pin the root bone's horizontal position to its rest position.
+  function lockRoot() {
+    if (!rootBone || !$('inPlace').checked) return;
+    rootBone.position.x = rootRest.x;
+    rootBone.position.z = rootRest.z;
+  }
+
+  function setupAnimations(gltf) {
+    if (mixer) mixer.stopAllAction();
+    clips = (gltf.animations || []).slice();
+    clips.forEach((c, i) => { if (!c.name || /^mixamo\.com$|^take 001$|^armature\|mixamo\.com/i.test(c.name)) c.name = 'clip_' + (i + 1); });
+    rootBone = findRootBone(gltf.scene);
+    if (rootBone) rootRest.copy(rootBone.position);
+    mixer = new THREE.AnimationMixer(gltf.scene);
+    currentClip = null; currentAction = null; playing = false;
+    clipState = clips.map((c, i) => ({ on: i === 0, frames: +$('animFrames').value || 8, loop: !isOneShot(c.name) }));
+    refreshClipUi();
+    if (clips.length) selectClip(0);
+    describeOutput();
+  }
+  function refreshClipUi() {
+    $('animGroup').hidden = !clips.length && !(rootBone);
+    $('clipSelect').innerHTML = clips.map((c, i) =>
+      '<option value="' + i + '">' + escapeHtml(c.name) + ' (' + c.duration.toFixed(2) + 's)</option>').join('');
+    if (currentClip) $('clipSelect').value = String(clips.indexOf(currentClip));
+    const list = $('clipList');
+    list.innerHTML = '';
+    clips.forEach((c, i) => {
+      const st = clipState[i];
+      const row = document.createElement('label');
+      row.className = 'clip-row';
+      const box = document.createElement('input'); box.type = 'checkbox'; box.checked = st.on;
+      const name = document.createElement('span'); name.textContent = c.name; name.title = c.name + ' · ' + c.duration.toFixed(2) + 's';
+      const fr = document.createElement('input'); fr.type = 'number'; fr.min = 1; fr.max = 64; fr.value = st.frames;
+      fr.setAttribute('aria-label', 'Frames for ' + c.name);
+      const lp = document.createElement('small');
+      const lb = document.createElement('input'); lb.type = 'checkbox'; lb.checked = st.loop;
+      lb.setAttribute('aria-label', 'Loop ' + c.name);
+      lp.append(lb, document.createTextNode('loop'));
+      box.addEventListener('change', () => { st.on = box.checked; if (box.checked) selectClip(i); describeOutput(); });
+      fr.addEventListener('input', () => { st.frames = Math.max(1, Math.min(64, Math.round(+fr.value || 1))); describeOutput(); });
+      lb.addEventListener('change', () => { st.loop = lb.checked; });
+      row.append(box, name, fr, lp);
+      list.appendChild(row);
+    });
+    $('addAnimBtn').parentElement.hidden = !rootBone;
+  }
+  function selectedClips() {
+    return clips.map((clip, i) => ({ clip, ...clipState[i] })).filter(c => c.on && c.frames > 0);
+  }
+  function selectClip(i) {
+    if (!mixer || !clips[i]) return;
+    mixer.stopAllAction();
+    currentClip = clips[i];
+    currentAction = mixer.clipAction(currentClip);
+    currentAction.reset().play();
+    setPlaying(true);
+    mixer.setTime(0);
+    lockRoot();
+    $('clipSelect').value = String(i);
+    syncScrub();
+    describeOutput();
+  }
+  // Poses the model at time t of a clip (used while rendering).
+  function poseAt(clip, t) {
+    mixer.stopAllAction();
+    mixer.clipAction(clip).reset().play();
+    mixer.setTime(t);
+    lockRoot();
+  }
+  function setPlaying(on) {
+    playing = on;
+    $('playBtn').textContent = on ? 'Pause' : 'Play';
+  }
+  function clipTime() {
+    return currentClip ? (mixer.time % currentClip.duration + currentClip.duration) % currentClip.duration : 0;
+  }
+  function syncScrub() {
+    if (!currentClip) return;
+    const t = clipTime();
+    $('scrub').value = Math.round(t / currentClip.duration * 1000);
+    $('scrubVal').textContent = t.toFixed(2) + 's';
+  }
+  $('clipSelect').addEventListener('change', () => selectClip(+$('clipSelect').value));
+  $('playBtn').addEventListener('click', () => setPlaying(!playing));
+  $('scrub').addEventListener('input', () => {
+    if (!currentClip) return;
+    setPlaying(false);
+    mixer.setTime(+$('scrub').value / 1000 * currentClip.duration);
+    lockRoot();
+    $('scrubVal').textContent = clipTime().toFixed(2) + 's';
+  });
+  $('inPlace').addEventListener('change', () => { if (!$('inPlace').checked && rootBone) rootBone.position.copy(rootRest); lockRoot(); });
+
+  // ---- Adding clips from other files (e.g. Mixamo downloads) ----
+  const normBone = n => String(n).replace(/^.*[:|]/, '').replace(/^mixamorig/i, '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+  $('addAnimBtn').addEventListener('click', () => $('animInput').click());
+  $('animInput').addEventListener('change', async () => {
+    const files = Array.from($('animInput').files);
+    $('animInput').value = '';
+    if (!files.length || !model) return;
+    const names = new Map();   // exact node name -> node
+    const norm = new Map();    // normalized name -> exact name
+    model.traverse(o => { if (o.name) { names.set(o.name, o); if (!norm.has(normBone(o.name))) norm.set(normBone(o.name), o.name); } });
+    const report = [];
+    for (const f of files) {
+      try {
+        const res = await loadSingle(f);
+        const base = f.name.replace(/\.(fbx|glb|gltf)$/i, '').replace(/\s+/g, '_');
+        const list = res.animations || [];
+        if (!list.length) { report.push(f.name + ': no animation found'); continue; }
+        list.forEach((src, k) => {
+          let matched = 0, exact = 0;
+          const tracks = [];
+          src.tracks.forEach(t => {
+            const dot = t.name.lastIndexOf('.');
+            const node = t.name.slice(0, dot), prop = t.name.slice(dot);
+            let target = names.has(node) ? node : null;
+            if (target) exact++;
+            else target = norm.get(normBone(node)) || null;
+            if (!target) return;
+            matched++;
+            const tr = t.clone();
+            tr.name = target + prop;
+            tracks.push(tr);
+          });
+          const total = src.tracks.length || 1;
+          const sameRig = exact === matched;
+          // A different skeleton has different proportions: keep rotations only.
+          const kept = sameRig ? tracks : tracks.filter(t => /\.quaternion$/.test(t.name));
+          if (matched / total < 0.5 || !kept.length) {
+            report.push(f.name + ': skeleton does not match this character (' + matched + ' of ' + total + ' tracks). Load that file as the model instead.');
+            return;
+          }
+          const nm = list.length > 1 ? base + '_' + (src.name && !/mixamo\.com/i.test(src.name) ? src.name.replace(/[^a-z0-9_]+/gi, '_') : k + 1) : base;
+          const clip = new THREE.AnimationClip(nm, src.duration, kept);
+          clips.push(clip);
+          clipState.push({ on: true, frames: +$('animFrames').value || 8, loop: !isOneShot(nm) });
+          report.push(nm + ': added' + (sameRig ? '' : ' (rotations only, matched by bone name)'));
+        });
+      } catch (err) {
+        report.push(f.name + ': could not be read (' + ((err && err.message) || err) + ')');
+      }
+    }
+    refreshClipUi();
+    if (clips.length) selectClip(clips.length - 1);
+    $('animAddHint').textContent = report.join(' · ');
+    describeOutput();
+  });
+
+  // ---------- Prop attached to a bone ----------
+  let prop = null, propHolder = null, propLen = 1, charHeight = 1;
+  function setupPropBones() {
+    const bones = [];
+    model.traverse(o => { if ((o.isBone || o.type === 'Bone') && o.name) bones.push(o.name); });
+    $('propGroup').hidden = !bones.length;
+    if (!bones.length) return;
+    const pick = bones.find(n => /^(mixamorig)?righthand$/i.test(n.replace(/[^a-z]/gi, ''))) ||
+                 bones.find(n => /wrist\.?_?r$|hand\.?_?r$|right.?hand|r.?hand$/i.test(n)) || bones[0];
+    $('propBone').innerHTML = bones.map(n => '<option' + (n === pick ? ' selected' : '') + '>' + escapeHtml(n) + '</option>').join('');
+  }
+  function removeProp(silent) {
+    if (propHolder && propHolder.parent) propHolder.parent.remove(propHolder);
+    prop = propHolder = null;
+    $('propBlock').hidden = true;
+    $('propRemove').hidden = true;
+    if (!silent && model) { buildPartsList(); buildMaterialList(); }
+  }
+  function placeProp() {
+    if (!propHolder || !model) return;
+    const bone = model.getObjectByName($('propBone').value);
+    if (!bone) return;
+    if (propHolder.parent !== bone) bone.add(propHolder);
+    scene.updateMatrixWorld(true);
+    const ws = bone.getWorldScale(new THREE.Vector3()).x || 1;
+    const unit = charHeight / ws;   // one character height, in the bone's units
+    propHolder.scale.setScalar((+$('propSize').value / 100) * unit / propLen);
+    propHolder.position.set(+$('propX').value / 100 * unit, +$('propY').value / 100 * unit, +$('propZ').value / 100 * unit);
+    const d = Math.PI / 180;
+    propHolder.rotation.set(+$('propRX').value * d, +$('propRY').value * d, +$('propRZ').value * d);
+  }
+  ['propBone', 'propSize', 'propX', 'propY', 'propZ', 'propRX', 'propRY', 'propRZ'].forEach(id =>
+    $(id).addEventListener(id === 'propBone' ? 'change' : 'input', placeProp));
+  $('propBtn').addEventListener('click', () => $('propInput').click());
+  $('propRemove').addEventListener('click', () => removeProp(false));
+  $('propInput').addEventListener('change', async () => {
+    const f = $('propInput').files[0];
+    $('propInput').value = '';
+    if (!f || !model) return;
+    try {
+      const res = await loadSingle(f);
+      removeProp(true);
+      prop = res.scene;
+      prop.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(prop);
+      const size = box.getSize(new THREE.Vector3());
+      propLen = Math.max(size.x, size.y, size.z) || 1;
+      prop.position.sub(box.getCenter(new THREE.Vector3()));
+      prop.traverse(o => {
+        if (!o.isMesh) return;
+        o.frustumCulled = false;
+        o.material = Array.isArray(o.material) ? o.material.map(m => m.clone()) : o.material.clone();
+        (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (m.color) originals.set(m, { color: m.color.clone(), map: m.map || null }); });
+      });
+      propHolder = new THREE.Group();
+      propHolder.name = 'Prop: ' + f.name;
+      propHolder.add(prop);
+      // Character height at rest, in world units, before the prop is added.
+      scene.updateMatrixWorld(true);
+      charHeight = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3()).y || 1;
+      placeProp();
+      $('propBlock').hidden = false;
+      $('propRemove').hidden = false;
+      buildPartsList();
+      buildMaterialList();
+      statusEl.textContent = 'Prop attached to ' + $('propBone').value + '. Use the sliders to fit it in the hand.';
+    } catch (err) {
+      statusEl.textContent = 'The prop could not be loaded: ' + ((err && err.message) || err);
+    }
+  });
+
+  $('flipBtn').addEventListener('click', () => {
+    if (!model) return;
+    const y = $('rotYSlider');
+    y.value = ((+y.value + 360) % 360) - 180;
+    $('rotYVal').textContent = y.value + '°';
+    applyPose();
+  });
+  $('resetViewBtn').addEventListener('click', () => { if (model) resetView(); });
+
+  // ---------- Rendering ----------
+  let atlasJson = null, atlasBlob = null, atlasName = 'sprite', atlasSuffix = '_atlas';
+
+  renderBtn.addEventListener('click', async () => {
+    if (!model) return;
+    renderBtn.disabled = true;
+    saveRow.hidden = true;
+    outputGrid.innerHTML = '';
+    try { await ($('sweepMode').checked ? renderSweep() : renderAll()); }
+    catch (err) { statusEl.textContent = 'Rendering failed: ' + err.message; }
+    finally { rendering = false; }
+    renderBtn.disabled = false;
+    progressBar.hidden = true;
+  });
+
+  async function renderAll() {
+    const size = +$('outSize').value;
+    const spinCount = +$('spinFrames').value;
+    const tiltCount = +$('tiltFrames').value;
+    const spinRange = +$('spinRange').value * Math.PI / 180;
+    const recolor = $('recolor').checked;
+    const rows = recolor ? +$('variants').value : 1;
+    const autoOrient = $('autoOrient').checked;
+    atlasName = fileName();
+    atlasSuffix = '_atlas';
+    const sel = selectedClips();
+    const animCount = sel.reduce((a, c) => a + c.frames, 0);
+    const legacyKeys = sel.length === 1;   // one clip: keep the original anim_0..N keys
+    const clipKey = n => n.replace(/[^a-z0-9_]+/gi, '_').replace(/^_+|_+$/g, '') || 'clip';
+    const restClip = currentClip, restTime = currentClip ? clipTime() : 0;
+    const cols = 1 + animCount + spinCount + tiltCount;
+    rendering = true;
+    const total = rows * cols;
+    let done = 0;
+
+    progressBar.hidden = false;
+    progressFill.style.width = '0%';
+
+    const off = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+    off.setPixelRatio(1);
+    off.setClearColor(0x000000, 0);
+    off.outputColorSpace = THREE.SRGBColorSpace;
+    off.toneMapping = THREE.ACESFilmicToneMapping;
+    off.setSize(size, size, false);
+    const offCam = new THREE.PerspectiveCamera(camera.fov, 1, 0.05, 100);
+
+    const pose = { px: pivot.rotation.x, py: pivot.rotation.y, roll: spin.rotation.z };
+    // The model fits in a 2-unit box, so a sphere of radius ~1.75 holds it at any spin angle.
+    // A fixed distance keeps every frame at the same scale, so animations don't jitter.
+    const radius = autoOrient ? 1.05 : 1.75;
+    const fitDist = radius / Math.sin((offCam.fov * Math.PI / 180) / 2);
+    const target = controls.target.clone();
+    function placeCamera(dir) {
+      offCam.position.copy(dir).normalize().multiplyScalar(fitDist).add(target);
+      offCam.lookAt(target);
+      offCam.updateProjectionMatrix();
+    }
+    const viewDir = camera.position.clone().sub(controls.target);
+    const wait = () => new Promise(r => requestAnimationFrame(() => r()));
+    const out = [];
+
+    function capture(key) {
+      scene.updateMatrixWorld(true);
+      off.render(scene, offCam);
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      c.getContext('2d', { willReadFrequently: true }).drawImage(off.domElement, 0, 0);
+      out.push({ key, canvas: c });
+      done++;
+      progressFill.style.width = Math.round(done / total * 100) + '%';
+      statusEl.textContent = 'Rendering ' + done + ' of ' + total + '…';
+    }
+
+    for (let row = 0; row < rows; row++) {
+      const prefix = 'p' + (row + 1);
+      applyColor(row);
+
+      placeCamera(viewDir);
+      pivot.rotation.set(pose.px, pose.py, 0);
+      spin.rotation.z = pose.roll;
+      if (restClip) poseAt(restClip, restTime);
+      capture(prefix + '_rest');
+      await wait();
+
+      for (const c of sel) {
+        for (let i = 0; i < c.frames; i++) {
+          // Looping clips: evenly spaced, last frame leads back into the first.
+          // One-shot clips: first to last pose, inclusive.
+          const k = c.loop ? i / c.frames : (c.frames > 1 ? i / (c.frames - 1) : 0);
+          poseAt(c.clip, Math.min(c.clip.duration - 1e-4, c.clip.duration * k));
+          capture(prefix + (legacyKeys ? '_anim_' : '_' + clipKey(c.clip.name) + '_') + i);
+          await wait();
+        }
+      }
+      if (restClip) poseAt(restClip, restTime);
+
+      for (let i = 0; i < spinCount; i++) {
+        spin.rotation.z = pose.roll + (i / spinCount) * spinRange;
+        capture(prefix + '_spin_' + i);
+        await wait();
+      }
+
+      // Tilted frames: for long objects, seen nearly straight on (as if stuck in a target);
+      // otherwise from the current view.
+      placeCamera(autoOrient ? new THREE.Vector3(0, 0.35, 1) : viewDir);
+      for (let i = 0; i < tiltCount; i++) {
+        const t = tiltCount === 1 ? 0 : (i / (tiltCount - 1)) * 2 - 1;   // -1..1
+        if (autoOrient) {
+          pivot.rotation.set(-0.12 + 0.05 * Math.abs(t), t * 0.3, 0);
+          spin.rotation.z = pose.roll + t * 0.4;
+        } else {
+          pivot.rotation.set(pose.px, pose.py, t * 0.35);
+          spin.rotation.z = pose.roll;
+        }
+        capture(prefix + '_stuck_' + i);
+        await wait();
+      }
+    }
+
+    pivot.rotation.set(pose.px, pose.py, 0);
+    spin.rotation.z = pose.roll;
+    applyColor(0);
+    off.dispose();
+
+    // Crop every frame to ONE shared box so frames stay aligned and the sheet has no empty space
+    let x0 = size, y0 = size, x1 = -1, y1 = -1;
+    out.forEach(f => {
+      const d = f.canvas.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, size, size).data;
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+        if (d[(y * size + x) * 4 + 3] > 4) {
+          if (x < x0) x0 = x; if (x > x1) x1 = x;
+          if (y < y0) y0 = y; if (y > y1) y1 = y;
+        }
+      }
+    });
+    if (x1 < 0) { statusEl.textContent = 'Nothing was rendered. Reset the view and try again.'; return; }
+    const pad = 4;
+    x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad);
+    x1 = Math.min(size - 1, x1 + pad); y1 = Math.min(size - 1, y1 + pad);
+    const cw = x1 - x0 + 1, ch = y1 - y0 + 1;
+
+    // Many frames: wrap onto extra lines so the sheet stays under 4096 px wide (phones can't load wider).
+    const gridCols = Math.max(1, Math.min(cols, Math.floor(4096 / cw)));
+    const linesPerVariant = Math.ceil(cols / gridCols);
+    const sheet = document.createElement('canvas');
+    sheet.width = cw * gridCols; sheet.height = ch * rows * linesPerVariant;
+    const sctx = sheet.getContext('2d');
+    const frames = {};
+    out.forEach((f, i) => {
+      const idx = i % cols, variant = Math.floor(i / cols);
+      const col = idx % gridCols, row = variant * linesPerVariant + Math.floor(idx / gridCols);
+      sctx.drawImage(f.canvas, x0, y0, cw, ch, col * cw, row * ch, cw, ch);
+      frames[f.key] = { x: col * cw, y: row * ch, w: cw, h: ch };
+    });
+    const clipsJson = {};
+    sel.forEach(c => {
+      clipsJson[legacyKeys ? 'anim' : clipKey(c.clip.name)] = {
+        name: c.clip.name, frames: c.frames, seconds: +c.clip.duration.toFixed(3),
+        fps: +(c.frames / Math.max(c.clip.duration, 1e-3)).toFixed(2), loop: c.loop,
+      };
+    });
+
+    atlasJson = JSON.stringify({
+      name: atlasName,
+      image: atlasName + '_atlas.png',
+      cellWidth: cw, cellHeight: ch, columns: gridCols, rows: rows * linesPerVariant,
+      layout: 'Each color version (p1, p2) starts on a new line. Frames in order: rest' +
+        (animCount ? (legacyKeys ? ', anim_0..anim_' + (animCount - 1) : ', ' + sel.map(c => clipKey(c.clip.name) + '_0..' + (c.frames - 1)).join(', ')) : '') +
+        (spinCount ? ', spin_0..spin_' + (spinCount - 1) : '') +
+        (tiltCount ? ', stuck_0..stuck_' + (tiltCount - 1) + ' (leaning left to right)' : ''),
+      spinFrames: spinCount, spinDegrees: spinCount ? +$('spinRange').value : 0,
+      stuckFrames: tiltCount,
+      animFrames: legacyKeys ? animCount : 0,
+      animClip: legacyKeys ? sel[0].clip.name : null,
+      animSeconds: legacyKeys ? +sel[0].clip.duration.toFixed(3) : 0,
+      clips: clipsJson,
+      inPlace: !!rootBone && $('inPlace').checked,
+      naturalColors: !recolor,
+      colors: recolor ? [$('color1').value, $('color2').value].slice(0, rows) : [],
+      frames,
+      credit: $('credit').textContent
+    }, null, 2);
+    atlasBlob = await new Promise(r => sheet.toBlob(r, 'image/png'));
+
+    const card = document.createElement('div');
+    card.className = 'output-card';
+    card.style.gridColumn = '1 / -1';
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(atlasBlob);
+    img.alt = 'Sprite sheet for ' + atlasName;
+    const name = document.createElement('div');
+    name.className = 'name';
+    name.textContent = atlasName + '_atlas.png · ' + sheet.width + '×' + sheet.height + ' · ' + out.length +
+      ' frame' + (out.length > 1 ? 's' : '') + ' of ' + cw + '×' + ch + ' · ' + Math.round(atlasBlob.size / 1024) + ' KB';
+    card.append(img, name);
+    outputGrid.appendChild(card);
+
+    describeOutput();
+    saveRow.hidden = false;
+    statusEl.textContent = 'Done. ' + out.length + ' frame' + (out.length > 1 ? 's' : '') + ' packed into one sprite sheet.';
+  }
+
+  // ---------- Angle sweep (impostor sheet for a 3D game) ----------
+  // Model space after Auto-orient: long axis on Z, tip at z = -1, tail (flights) at z = +1,
+  // centre at the origin. Row r is seen from angle theta between the view direction and the
+  // tip direction: 0° = from straight behind (tail-on), 90° = side view. The camera is
+  // rolled so the tip always points UP in the image; column c spins the object about its
+  // own axis. Lights move with the camera, so every frame is lit the same way on screen.
+  async function renderSweep(preview) {
+    const size = +$('outSize').value;
+    const rowsN = +$('sweepRows').value;
+    const minA = +$('sweepMin').value, maxA = Math.max(minA + 1, +$('sweepMax').value);
+    const spinCount = preview ? 1 : Math.max(1, +$('spinFrames').value);
+    const spinRange = +$('spinRange').value * Math.PI / 180;
+    const recolor = $('recolor').checked;
+    const colorN = recolor ? +$('variants').value : 1;
+    const angles = [];
+    for (let r = 0; r < rowsN; r++) angles.push(rowsN === 1 ? minA : minA + (maxA - minA) * r / (rowsN - 1));
+    const total = colorN * rowsN * spinCount;
+    let done = 0;
+    rendering = true;
+    progressBar.hidden = false;
+    progressFill.style.width = '0%';
+
+    const off = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+    off.setPixelRatio(1);
+    off.setClearColor(0x000000, 0);
+    off.outputColorSpace = THREE.SRGBColorSpace;
+    off.toneMapping = THREE.ACESFilmicToneMapping;
+    off.setSize(size, size, false);
+    // A narrow lens is close to orthographic, so the game can add its own perspective.
+    const offCam = new THREE.PerspectiveCamera(14, 1, 0.1, 100);
+    const fitDist = 1.1 / Math.sin((offCam.fov * Math.PI / 180) / 2);
+    const origin = new THREE.Vector3(0, 0, 0);
+
+    const pose = { px: pivot.rotation.x, py: pivot.rotation.y, roll: spin.rotation.z };
+    const lightPos = { key: keyLight.position.clone(), rim: rimLight.position.clone() };
+    const KEY_CAM = new THREE.Vector3(1.6, 2.4, 2.2);   // upper right, in front (camera space)
+    const RIM_CAM = new THREE.Vector3(-2.0, 0.6, -2.4); // behind, left
+    pivot.rotation.set(0, 0, 0);
+
+    const tip = new THREE.Vector3(), tail = new THREE.Vector3(), ctr = new THREE.Vector3();
+    function px(vec) { // world point -> pixel in the uncropped frame
+      const q = vec.clone().project(offCam);
+      return { x: (q.x * 0.5 + 0.5) * size, y: (1 - (q.y * 0.5 + 0.5)) * size };
+    }
+    function placeAt(theta) {
+      const t = theta * Math.PI / 180;
+      offCam.position.set(0, -Math.sin(t), Math.cos(t)).multiplyScalar(fitDist);
+      offCam.up.set(0, -Math.cos(t), -Math.sin(t)); // the tip's on-screen direction = up
+      offCam.lookAt(origin);
+      offCam.updateProjectionMatrix();
+      offCam.updateMatrixWorld(true);
+      keyLight.position.copy(KEY_CAM).applyQuaternion(offCam.quaternion);
+      rimLight.position.copy(RIM_CAM).applyQuaternion(offCam.quaternion);
+    }
+    const wait = () => new Promise(r => requestAnimationFrame(() => r()));
+    const out = [];
+    const rowInfo = [];
+
+    for (let ci = 0; ci < colorN; ci++) {
+      applyColor(ci);
+      for (let r = 0; r < rowsN; r++) {
+        placeAt(angles[r]);
+        scene.updateMatrixWorld(true);
+        // Where the tip, tail and centre land (spin does not move them; they are on the axis)
+        tip.set(0, 0, -1);
+        tail.set(0, 0, 1); ctr.set(0, 0, 0);
+        if (ci === 0) rowInfo.push({ angle: +angles[r].toFixed(2), tip: px(tip), tail: px(tail), center: px(ctr) });
+        for (let c = 0; c < spinCount; c++) {
+          spin.rotation.z = pose.roll + (c / spinCount) * spinRange;
+          scene.updateMatrixWorld(true);
+          off.render(scene, offCam);
+          const cv = document.createElement('canvas');
+          cv.width = cv.height = size;
+          cv.getContext('2d', { willReadFrequently: true }).drawImage(off.domElement, 0, 0);
+          out.push({ key: 'p' + (ci + 1) + '_a' + r + '_s' + c, canvas: cv, row: ci * rowsN + r, col: c });
+          done++;
+          progressFill.style.width = Math.round(done / total * 100) + '%';
+          statusEl.textContent = (preview ? 'Previewing ' : 'Rendering ') + done + ' of ' + total + '…';
+          if (done % 4 === 0) await wait();
+        }
+      }
+    }
+
+    pivot.rotation.set(pose.px, pose.py, 0);
+    spin.rotation.z = pose.roll;
+    keyLight.position.copy(lightPos.key);
+    rimLight.position.copy(lightPos.rim);
+    applyColor(0);
+    off.dispose();
+
+    // One shared crop box for every frame, so the axis stays at the same place in every cell.
+    let x0 = size, y0 = size, x1 = -1, y1 = -1;
+    out.forEach(f => {
+      const d = f.canvas.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, size, size).data;
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+        if (d[(y * size + x) * 4 + 3] > 4) {
+          if (x < x0) x0 = x; if (x > x1) x1 = x;
+          if (y < y0) y0 = y; if (y > y1) y1 = y;
+        }
+      }
+    });
+    if (x1 < 0) { statusEl.textContent = 'Nothing was rendered. Reset the view and try again.'; return; }
+    // Keep the box symmetric about the centre column so rotating a frame about its axis is clean.
+    const cx = size / 2, pad = 4;
+    const half = Math.ceil(Math.max(cx - x0, x1 - cx)) + pad;
+    x0 = Math.max(0, Math.floor(cx - half)); x1 = Math.min(size - 1, Math.ceil(cx + half) - 1);
+    y0 = Math.max(0, y0 - pad); y1 = Math.min(size - 1, y1 + pad);
+    const cw = x1 - x0 + 1, ch = y1 - y0 + 1;
+
+    const cols = spinCount, rows = colorN * rowsN;
+    const sheet = document.createElement('canvas');
+    sheet.width = cw * cols; sheet.height = ch * rows;
+    const sctx = sheet.getContext('2d');
+    const frames = {};
+    out.forEach(f => {
+      sctx.drawImage(f.canvas, x0, y0, cw, ch, f.col * cw, f.row * ch, cw, ch);
+      frames[f.key] = { x: f.col * cw, y: f.row * ch, w: cw, h: ch };
+    });
+    const rnd = v => Math.round(v * 10) / 10;
+    const rowsJson = rowInfo.map(ri => ({
+      angle: ri.angle,
+      tip: { x: rnd(ri.tip.x - x0), y: rnd(ri.tip.y - y0) },
+      tail: { x: rnd(ri.tail.x - x0), y: rnd(ri.tail.y - y0) },
+      center: { x: rnd(ri.center.x - x0), y: rnd(ri.center.y - y0) },
+    }));
+    const lengthPx = rnd(Math.abs(rowInfo[rowInfo.length - 1].tail.y - rowInfo[rowInfo.length - 1].tip.y) /
+      Math.max(1e-6, Math.sin(angles[angles.length - 1] * Math.PI / 180)));
+
+    if (preview) {
+      const card = document.createElement('div');
+      card.className = 'output-card';
+      card.style.gridColumn = '1 / -1';
+      const img = document.createElement('img');
+      // Preview: lay the rows out side by side so all angles are visible at once.
+      const strip = document.createElement('canvas');
+      strip.width = cw * rows; strip.height = ch;
+      out.forEach((f, i) => strip.getContext('2d').drawImage(sheet, f.col * cw, f.row * ch, cw, ch, i * cw, 0, cw, ch));
+      img.src = strip.toDataURL('image/png');
+      img.alt = 'Angle preview';
+      const name = document.createElement('div');
+      name.className = 'name';
+      name.textContent = 'Angles, left to right: ' + angles.map(a => Math.round(a) + '°').join(' · ') + '  (tail-on → side view)';
+      card.append(img, name);
+      outputGrid.appendChild(card);
+      statusEl.textContent = 'Preview ready. The first frames should show the flights as an X; the last a full side view with the tip up.';
+      return;
+    }
+
+    atlasName = fileName();
+    atlasSuffix = '_sweep';
+    atlasJson = JSON.stringify({
+      name: atlasName,
+      type: 'angle-sweep',
+      image: atlasName + '_sweep.png',
+      cellWidth: cw, cellHeight: ch, columns: cols, rows,
+      layout: 'Rows: color version (p1, p2) then viewing angle, low to high. Columns: spin steps. ' +
+        'Frame key p{color}_a{angleIndex}_s{spinIndex}. The tip points up in every frame.',
+      angleDefinition: 'Angle between the view direction and the direction the tip points: 0 = seen from straight behind (tail-on), 90 = side view.',
+      angles: angles.map(a => +a.toFixed(2)),
+      spinFrames: cols, spinDegrees: +$('spinRange').value,
+      angleRows: rowsJson,
+      fullLengthPx: lengthPx,
+      naturalColors: !recolor,
+      colors: recolor ? [$('color1').value, $('color2').value].slice(0, colorN) : [],
+      frames,
+      credit: $('credit').textContent
+    }, null, 2);
+    atlasBlob = await new Promise(r => sheet.toBlob(r, 'image/png'));
+
+    const card = document.createElement('div');
+    card.className = 'output-card';
+    card.style.gridColumn = '1 / -1';
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(atlasBlob);
+    img.alt = 'Angle sweep sheet for ' + atlasName;
+    const name = document.createElement('div');
+    name.className = 'name';
+    const big = Math.max(sheet.width, sheet.height) > 4096;
+    name.textContent = atlasName + '_sweep.png · ' + sheet.width + '×' + sheet.height + ' · ' + out.length +
+      ' frames of ' + cw + '×' + ch + ' · ' + Math.round(atlasBlob.size / 1024) + ' KB' +
+      (big ? ' · Over 4096 px: lower the render size or angle count so phones can load it.' : '');
+    card.append(img, name);
+    outputGrid.appendChild(card);
+    describeOutput();
+    saveRow.hidden = false;
+    statusEl.textContent = 'Done. ' + out.length + ' frames packed into one angle sweep sheet.';
+  }
+
+  // ---------- Saving ----------
+  // Inside Claude the page saves through the downloads capability; opened as a plain file
+  // in a browser, it falls back to a normal download link.
+  const insideClaude = !!(window.claude && window.claude.use);
+  let downloads = null;
+  if (insideClaude) window.claude.use('downloads').then(d => { downloads = d; }).catch(() => {});
+
+  saveBtn.addEventListener('click', async () => {
+    if (!atlasBlob) return;
+    if (typeof JSZip === 'undefined') {
+      saveNote.textContent = 'The zip tool did not load. Reload the page and render again.';
+      return;
+    }
+    saveBtn.disabled = true;
+    saveNote.textContent = 'Packing…';
+    try {
+      const zip = new JSZip();
+      zip.file(atlasName + atlasSuffix + '.png', atlasBlob);
+      zip.file(atlasName + atlasSuffix + '.json', atlasJson);
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const zipName = atlasName + '_sprites.zip';
+      if (insideClaude) {
+        if (!downloads) throw { code: 'unavailable' };
+        await downloads.save({ filename: zipName, data: blob });
+      } else {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = zipName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      }
+      saveNote.textContent = 'Saved ' + zipName + '.';
+    } catch (err) {
+      const code = err && err.code;
+      saveNote.textContent =
+        code === 'declined' ? 'Save cancelled.' :
+        code === 'rate_limited' ? 'A save prompt is already open. Finish it, then try again.' :
+        'Saving is not available in this view. Open the page in claude.ai in a browser, or open the downloaded HTML file directly.';
+    }
+    saveBtn.disabled = false;
+  });
+})();
+</script>
+
+</body>
+</html>
