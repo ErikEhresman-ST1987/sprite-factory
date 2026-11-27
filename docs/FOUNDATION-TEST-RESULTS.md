@@ -40,4 +40,7 @@ User confirms foundation and alternative artwork display, duplicated location re
 ## B10 — Animation Studio — PASS
 User reports all eleven checks passed: multiple frames, alignment, onion skin, speed, preview, naming, playback setting selection, editable save/reopen, WebP strip export, metadata JSON export and export invalidation on settings change. No observations. Individual playback semantics and exported metadata contents not independently verified.
 
-B11–B14 pending.
+## B11 — Engine verification — FAIL (partial testing)
+Screenshots show both PixiJS v8 and Phaser 3 selections reject animation (1).json with 'Animation JSON is not a supported Workshop export.' Scene files not selected. Static inspection of main confirms verifier accepts version 1 only while Animation Studio emits version 2. F08: confirmed incompatible exporter/importer contracts; specific uploaded JSON contents not inspected. Engine initialization, sample rendering and scene placement remain unverified. Plan backward-compatible shared validation and playback semantics verification in foundation repair.
+
+B12–B14 pending; B11 remaining checks pending.
