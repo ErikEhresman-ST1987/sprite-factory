@@ -53,3 +53,6 @@ PixiJS selected screenshot displays PASS: PixiJS sprite touch zone tapped. Phase
 
 ### B11 Phaser confirmation
 Screenshot shows Phaser 3 selected and 'PASS: Phaser touch zone tapped. Sample assets rendered.' Both engines now confirmed for built-in rendering and touch interaction. Imported scene placement and background hotspot interaction remain unverified; animation export incompatibility remains failed.
+
+### B11 baseline closure
+User deleted temporary exported assets after workflow confusion. Defer imported scene and background hotspot checks to repair phase; no repeat scene construction required now. B11 remains failed for confirmed animation compatibility defect; sample rendering and touch pass in both engines. Proposed reusable regression fixtures for future testing, not yet created. Sample animation motion not explicitly confirmed.
