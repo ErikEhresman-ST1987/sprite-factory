@@ -31,4 +31,7 @@ User-reported: background and sprite loading, position/size/rotation/layering, s
 ## B08 — Scene resizing and hotspot preservation — PASS (2026-11-26)
 User-reported: scene dimensions, background/sprite resizing, hotspot visibility, position and size adjustment, editability and placement JSON export all passed. Observation: Seems to have worked. Exported JSON not supplied or independently inspected; finite/bounded coordinates and exact resizing path remain unverified. F01 remains open as a static code finding, not a reproduced runtime failure.
 
-B09–B14 pending.
+## B09 — Reusable visual locations — PARTIAL (2026-11-27)
+Additional submission labeled B08 repeated all seven passes and stated: I created the duplicates of the switched zone, and cleared and reloaded project It worked. Record duplication, switching and project recovery as reported observations; remaining B09 checks and visual-location export require confirmation. Do not count B09 as full pass yet.
+
+B10–B14 pending.
