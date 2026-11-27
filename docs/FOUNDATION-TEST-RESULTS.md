@@ -28,4 +28,7 @@ User confirms native picker never opens in any of the five modes; settings, inst
 ## B07 — Scene Editor — PASS (2026-11-26)
 User-reported: background and sprite loading, position/size/rotation/layering, sprite touch zones, background hotspot creation/editing, editable save/reopen, artwork/position/hotspot preservation and game placement export all passed. Observation: Everything worked. Stable IDs and malformed imports not independently inspected.
 
-B08–B14 pending.
+## B08 — Scene resizing and hotspot preservation — PASS (2026-11-26)
+User-reported: scene dimensions, background/sprite resizing, hotspot visibility, position and size adjustment, editability and placement JSON export all passed. Observation: Seems to have worked. Exported JSON not supplied or independently inspected; finite/bounded coordinates and exact resizing path remain unverified. F01 remains open as a static code finding, not a reproduced runtime failure.
+
+B09–B14 pending.
