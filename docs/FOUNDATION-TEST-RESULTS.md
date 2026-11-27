@@ -44,3 +44,6 @@ User reports all eleven checks passed: multiple frames, alignment, onion skin, s
 Screenshots show both PixiJS v8 and Phaser 3 selections reject animation (1).json with 'Animation JSON is not a supported Workshop export.' Scene files not selected. Static inspection of main confirms verifier accepts version 1 only while Animation Studio emits version 2. F08: confirmed incompatible exporter/importer contracts; specific uploaded JSON contents not inspected. Engine initialization, sample rendering and scene placement remain unverified. Plan backward-compatible shared validation and playback semantics verification in foundation repair.
 
 B12–B14 pending; B11 remaining checks pending.
+
+### B11 follow-up
+Screenshots confirm both engines render built-in sample assets. Missing WebP with JSON selected correctly triggers paired-file validation. Both samples display misleading zero-background-hotspots export warning with no placement uploaded; investigate warning scope. Animation motion, touch interaction and actual scene imports remain unverified. B11 remains failed due to F08.
