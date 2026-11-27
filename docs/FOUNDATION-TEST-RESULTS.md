@@ -47,3 +47,6 @@ B12–B14 pending; B11 remaining checks pending.
 
 ### B11 follow-up
 Screenshots confirm both engines render built-in sample assets. Missing WebP with JSON selected correctly triggers paired-file validation. Both samples display misleading zero-background-hotspots export warning with no placement uploaded; investigate warning scope. Animation motion, touch interaction and actual scene imports remain unverified. B11 remains failed due to F08.
+
+### B11 touch follow-up
+PixiJS selected screenshot displays PASS: PixiJS sprite touch zone tapped. Phaser selected screenshot displays same PixiJS message; selector alone does not establish active engine. PixiJS touch passed; Phaser touch pending explicit run and tap. Imported scenes remain untested.
