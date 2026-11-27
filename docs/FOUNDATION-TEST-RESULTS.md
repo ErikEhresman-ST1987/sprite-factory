@@ -37,4 +37,7 @@ Additional submission labeled B08 repeated all seven passes and stated: I create
 ### B09 final confirmation — PASS
 User confirms foundation and alternative artwork display, duplicated location repositioning, touch zone configuration and visual location JSON export all passed. Together with earlier reported switching, duplication and project recovery, B09 functional protocol is passed. Export contents not independently inspected.
 
-B10–B14 pending.
+## B10 — Animation Studio — PASS
+User reports all eleven checks passed: multiple frames, alignment, onion skin, speed, preview, naming, playback setting selection, editable save/reopen, WebP strip export, metadata JSON export and export invalidation on settings change. No observations. Individual playback semantics and exported metadata contents not independently verified.
+
+B11–B14 pending.
